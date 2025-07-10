@@ -177,5 +177,6 @@ def serve_login():
 def serve_static_files(filename):
     return send_from_directory(app.static_folder, filename)
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+if __name__ == "__main__":
+    app.run(debug=False, host="0.0.0.0", port=5000)
+
