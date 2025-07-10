@@ -37,6 +37,10 @@ UNIQUE_USERNAMES_COLLECTION = db.collection(f'artifacts/{APP_ID}/public/data/uni
 USER_PROFILES_COLLECTION = db.collection(f'artifacts/{APP_ID}/public/data/user_profiles')
 EMAIL_OTPS_COLLECTION = db.collection(f'artifacts/{APP_ID}/public/data/email_otps')
 
+UNIQUE_USERNAMES_COL = UNIQUE_USERNAMES_COLLECTION
+USER_PROFILES_COL = USER_PROFILES_COLLECTION
+EMAIL_OTPS_COL = EMAIL_OTPS_COLLECTION
+
 # --- Firebase Client-Side Config (for Frontend JS/SDK) ---
 FIREBASE_CLIENT_CONFIG = {
     "apiKey": "AIzaSyDMihwTLdN8pY1W0gxNacErV4u6PsLtT44",
