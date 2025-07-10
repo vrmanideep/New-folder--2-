@@ -409,13 +409,15 @@ def handle_google_auth_backend(id_token: str, display_name: str, email: str, pho
             user = auth.get_user(uid)
             print(f"User with UID {uid} already exists in Firebase Auth.")
             # If user exists, ensure their profile is up-to-date
-            USER_PROFILES_COLLECTION.document(uid).update({
+
+            USER_PROFILES_COLLECTION.document(uid).set({
                 'name': display_name or user.display_name,
                 'email': email or user.email,
                 'photoURL': photo_url or user.photo_url,
                 'lastLogin': firestore.SERVER_TIMESTAMP,
-                'authProvider': 'google' # Update provider if it was different
-            })
+                'authProvider': 'google'
+            }, merge=True)
+
             return {"success": True, "message": "Successfully signed in with Google."}
         except auth.UserNotFoundError:
             # User does not exist with this UID, check by email
