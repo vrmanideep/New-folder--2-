@@ -109,7 +109,7 @@ def register_user_backend(name: str, username: str, password: str) -> dict:
             'createdAt': firestore.SERVER_TIMESTAMP,
             'emailVerified': False,
             'authProvider': 'password' # Indicate password provider
-        })
+        }, merge=True)
         print(f"User profile for '{username}' stored in Firestore.")
 
         return {"success": True, "message": "Registration successful! You can now log in."}
