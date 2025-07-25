@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Page</title>
+    <!-- Tailwind CSS CDN for easy styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles to make it look different */
+        body {
+            font-family: 'Inter', sans-serif; /* Using Inter font as per instructions */
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); /* Gradient background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px; /* Add some padding for smaller screens */
+            box-sizing: border-box; /* Include padding in element's total width and height */
+        }
+
+        .login-container {
+            background-color: #ffffff;
+            padding: 2.5rem; /* Increased padding */
+            border-radius: 1.5rem; /* More rounded corners */
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); /* Enhanced shadow */
+            width: 100%;
+            max-width: 400px; /* Max width for better control on larger screens */
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.3); /* Subtle border */
+            backdrop-filter: blur(5px); /* Frosted glass effect */
+            -webkit-backdrop-filter: blur(5px); /* For Safari */
+        }
+
+        .login-container h2 {
+            color: #333;
+            margin-bottom: 2rem; /* More space below heading */
+            font-size: 2.25rem; /* Larger heading */
+            font-weight: 700; /* Bold font */
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem; /* Space between input groups */
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #555;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 0.85rem 1rem; /* Slightly more padding */
+            border: 1px solid #ddd;
+            border-radius: 0.75rem; /* Rounded input fields */
+            font-size: 1rem;
+            color: #333;
+            outline: none;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .input-group input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3); /* Focus ring effect */
+        }
+
+        .login-button {
+            width: 100%;
+            padding: 1rem; /* Generous padding for button */
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); /* Gradient button */
+            color: white;
+            border: none;
+            border-radius: 0.75rem; /* Rounded button */
+            font-size: 1.1rem; /* Larger font for button */
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+            box-shadow: 0 5px 15px rgba(118, 75, 162, 0.4); /* Button shadow */
+        }
+
+        .login-button:hover {
+            background: linear-gradient(90deg, #764ba2 0%, #667eea 100%); /* Reverse gradient on hover */
+            transform: translateY(-2px); /* Slight lift effect */
+        }
+
+        .login-button:active {
+            transform: translateY(0); /* Press down effect */
+            box-shadow: 0 2px 5px rgba(118, 75, 162, 0.2);
+        }
+
+        .register-link {
+            margin-top: 1.5rem; /* Space above the register link */
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .register-link a {
+            color: #667eea; /* Link color */
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s ease;
+        }
+
+        .register-link a:hover {
+            color: #764ba2; /* Darker color on hover */
+            text-decoration: underline;
+        }
+        .message {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        .message.success { color: #28a745; }
+        .message.error { color: #dc3545; }
+        .message.info { color: #007bff; }
+
+        /* New styles for Gemini API feature */
+        .gemini-button {
+            width: 100%;
+            padding: 0.8rem;
+            margin-top: 1rem;
+            background: linear-gradient(90deg, #242c9d 0%, #0d0d15 100%); /* Green gradient */
+            color: white;
+            border: none;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+            box-shadow: 0 5px 15px rgba(38, 60, 99, 0.4);
+        }
+        .gemini-button:hover {
+            background: linear-gradient(90deg, #2e2e9b 0%, #312448 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(46, 35, 90, 0.5);
+        }
+        .gemini-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 5px rgba(76, 175, 80, 0.2);
+        }
+        .gemini-response {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background-color: #f8f8f8;
+            border-radius: 0.75rem;
+            text-align: left;
+            color: #333;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            border: 1px solid #eee;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+            max-height: 200px; /* Limit height */
+            overflow-y: auto; /* Add scroll if content overflows */
+        }
+        .gemini-response.hidden {
+            display: none;
+        }
+        .gemini-response.loading {
+            text-align: center;
+            font-style: italic;
+            color: #777;
+        }
+
+        /* Google Sign-In Button Style */
+        .google-signin-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 0.85rem 1rem;
+            margin-top: 1rem;
+            background-color: #595c60; /* Google Blue */
+            color: white;
+            border: none;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+            box-shadow: 0 5px 15px rgba(66, 133, 244, 0.4);
+        }
+        .google-signin-button:hover {
+            background-color: #bc0b8470; /* Darker blue on hover */
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(66, 133, 244, 0.5);
+        }
+        .google-signin-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 5px rgba(66, 133, 244, 0.2);
+        }
+        .google-signin-button img {
+            margin-right: 0.75rem;
+            height: 1.2rem;
+            width: 1.2rem;
+        }
+
+        /* Responsive adjustments for new features */
+        @media (max-width: 480px) {
+            .gemini-button, .google-signin-button {
+                padding: 0.7rem;
+                font-size: 0.9rem;
+            }
+            .google-signin-button img {
+                height: 1rem;
+                width: 1rem;
+                margin-right: 0.5rem;
+            }
+            .gemini-response {
+                padding: 0.8rem;
+                font-size: 0.85rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2>Welcome Back!</h2>
+        <form id="login-form">
+            <div class="input-group">
+                <label for="identifier">Username or Email</label>
+                <input type="text" id="identifier" name="identifier" placeholder="Enter your username or email" required>
+            </div>
+            <div class="input-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Enter your password" required>
+            </div>
+            <button type="submit" class="login-button">Login</button>
+            <p id="login-message" class="message"></p>
+        </form>
+
+        <button id="google-signin-button" class="google-signin-button">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google logo">
+            Sign in with Google
+        </button>
+
+        <p class="register-link">
+            Don't have an account? <a href="register.html">Register</a>
+        </p>
+
+        <!-- Gemini API Feature -->
+        <button id="gemini-help-button" class="gemini-button">✨ Get Login Help ✨</button>
+        <div id="gemini-response" class="gemini-response hidden"></div>
+
+        <h4>Coming soon</h4>
+    </div>
+
+    <script type="module">
+        // Import Firebase SDK modules
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        // Placeholder for Firebase client configuration (will be fetched from backend)
+        let firebaseClientConfig = {};
+        let firebaseAuthInstance; // Store the auth instance
+
+        // Function to fetch client config from backend
+        async function fetchFirebaseClientConfig() {
+            try {
+                const response = await fetch('/api/firebase-config');
+                const config = await response.json();
+                if (config.success && config.config) {
+                    firebaseClientConfig = config.config;
+                    // Initialize Firebase App ONLY after config is fetched
+                    const app = initializeApp(firebaseClientConfig);
+                    firebaseAuthInstance = getAuth(app); // Assign to global variable
+                    console.log("Firebase client app initialized.");
+
+                    // Listen for auth state changes (important for home.html)
+                    onAuthStateChanged(firebaseAuthInstance, (user) => {
+                        if (user) {
+                            console.log("Firebase Auth State Changed: User is logged in.", user.uid);
+                            // No need to store userId in localStorage here, Firebase SDK manages it.
+                            // The home.html will check Firebase Auth state directly.
+                        } else {
+                            console.log("Firebase Auth State Changed: User is logged out.");
+                            // If user is on a protected page and logs out, redirect to login
+                            if (window.location.pathname.includes('home.html')) {
+                                window.location.href = 'login.html';
+                            }
+                        }
+                    });
+
+                } else {
+                    console.error("Failed to fetch Firebase client config:", config.message);
+                    loginMessage.textContent = "Error: Could not initialize Firebase. Please try again.";
+                    loginMessage.classList.add('error');
+                }
+            } catch (error) {
+                console.error("Network error fetching Firebase client config:", error);
+                loginMessage.textContent = "Network error: Could not initialize Firebase.";
+                loginMessage.classList.add('error');
+            }
+        }
+
+        // Fetch config and initialize Firebase on page load
+        fetchFirebaseClientConfig();
+
+
+        const loginForm = document.getElementById('login-form');
+        const identifierInput = document.getElementById('identifier');
+        const passwordInput = document.getElementById('password');
+        const loginMessage = document.getElementById('login-message');
+        const geminiHelpButton = document.getElementById('gemini-help-button');
+        const geminiResponseDiv = document.getElementById('gemini-response');
+        const googleSignInButton = document.getElementById('google-signin-button'); // New button reference
+
+        // --- Email/Password Login ---
+        loginForm.addEventListener('submit', async (event) => {
+            event.preventDefault(); // Prevent default form submission
+
+            const identifier = identifierInput.value.trim();
+            const password = passwordInput.value.trim();
+
+            loginMessage.textContent = ''; // Clear previous messages
+            loginMessage.className = 'message'; // Reset classes
+
+            if (!identifier || !password) {
+                loginMessage.textContent = 'Please enter both username/email and password.';
+                loginMessage.classList.add('error');
+                return;
+            }
+
+            loginMessage.textContent = 'Logging in...';
+            loginMessage.classList.add('info');
+
+            try {
+                // 1. Call your Flask backend to get a custom token
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ identifier, password }),
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success && result.customToken) {
+                    // 2. Use Firebase JS SDK to sign in with the custom token
+                    await signInWithCustomToken(firebaseAuthInstance, result.customToken);
+
+                    loginMessage.textContent = result.message;
+                    loginMessage.classList.add('success');
+                    window.location.href = 'home.html'; // Redirect after successful Firebase Auth sign-in
+
+                } else {
+                    loginMessage.textContent = result.message || 'Login failed. Please try again.';
+                    loginMessage.classList.add('error');
+                }
+            } catch (error) {
+                console.error('Login process error:', error);
+                if (error.code) {
+                    loginMessage.textContent = `Firebase Auth Error: ${error.message}`;
+                } else {
+                    loginMessage.textContent = 'Network error during login. Please try again later.';
+                }
+                loginMessage.classList.add('error');
+            }
+        });
+
+        // --- Google Sign-In ---
+        googleSignInButton.addEventListener('click', async () => {
+            loginMessage.textContent = 'Signing in with Google...';
+            loginMessage.className = 'message info';
+
+            try {
+                const provider = new GoogleAuthProvider();
+                const result = await signInWithPopup(firebaseAuthInstance, provider);
+                const user = result.user;
+                const idToken = await user.getIdToken(); // Get the ID token from Google Sign-In
+
+                console.log("Google Sign-In successful on client. Sending ID token to backend.");
+
+                // Send the ID token to your Flask backend for verification and profile management
+                const backendResponse = await fetch('/api/google-auth', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${idToken}` // Send Google ID token
+                    },
+                    body: JSON.stringify({
+                        displayName: user.displayName,
+                        email: user.email,
+                        photoURL: user.photoURL
+                    })
+                });
+
+                const backendResult = await backendResponse.json();
+
+                if (backendResponse.ok && backendResult.success) {
+                    loginMessage.textContent = backendResult.message;
+                    loginMessage.classList.add('success');
+                    window.location.href = 'home.html'; // Redirect after backend confirms
+                } else {
+                    loginMessage.textContent = backendResult.message || 'Google sign-in failed on server.';
+                    loginMessage.classList.add('error');
+                    // Optionally sign out from client-side Firebase if backend fails
+                    await firebaseAuthInstance.signOut();
+                }
+
+            } catch (error) {
+                console.error('Google Sign-In error:', error);
+                if (error.code === 'auth/popup-closed-by-user') {
+                    loginMessage.textContent = 'Google sign-in cancelled.';
+                } else if (error.code) {
+                    loginMessage.textContent = `Google Sign-In Error: ${error.message}`;
+                } else {
+                    loginMessage.textContent = 'Network error during Google sign-in. Please try again.';
+                }
+                loginMessage.classList.add('error');
+            }
+        });
+
+
+        // --- Gemini API Integration for Login Help ---
+        geminiHelpButton.addEventListener('click', async () => {
+            geminiResponseDiv.classList.remove('hidden');
+            geminiResponseDiv.classList.add('loading');
+            geminiResponseDiv.textContent = 'Generating login tips... Please wait.';
+
+            try {
+                const response = await fetch('/api/login-tips', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                const result = await response.json();
+
+                geminiResponseDiv.classList.remove('loading');
+                if (response.ok) {
+                    geminiResponseDiv.innerHTML = '<strong>Here are some tips:</strong><br>' + result.tips;
+                } else {
+                    geminiResponseDiv.textContent = result.message || 'Failed to get login tips. Please try again later.';
+                    geminiResponseDiv.classList.add('error');
+                }
+            } catch (error) {
+                console.error('Error fetching login tips:', error);
+                geminiResponseDiv.classList.remove('loading');
+                geminiResponseDiv.textContent = 'Network error while fetching tips. Please try again.';
+                geminiResponseDiv.classList.add('error');
+            }
+        });
+    </script>
+</body>
+</html>
