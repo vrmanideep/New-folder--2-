@@ -15,7 +15,7 @@ from .auth_service import (
     update_user_address_backend,
     handle_google_auth_backend # Import the new Google auth function
 )
-from firebase_config import FIREBASE_CLIENT_CONFIG
+from .firebase_config import FIREBASE_CLIENT_CONFIG
 import firebase_config
 import os
 import asyncio
