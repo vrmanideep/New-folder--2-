@@ -1,8 +1,11 @@
 # backend/app.py
 
-from flask import Flask, request, jsonify, send_from_directory
+import os
+from flask import Flask, request, jsonify, send_from_directory, render_template # Ensure render_template is imported
 from functools import wraps
 from firebase_admin import auth
+
+# Relative import for auth_service.py
 from .auth_service import (
     check_username_uniqueness_backend,
     register_user_backend,
@@ -15,15 +18,31 @@ from .auth_service import (
     update_user_address_backend,
     handle_google_auth_backend # Import the new Google auth function
 )
-from . import firebase_config # Corrected import
-import os
+
+# Relative import for firebase_config.py
+from . import firebase_config # Imports the module as 'firebase_config'
+
 import asyncio
 
-# Initialize Flask app, explicitly setting the static folder to the current directory
-# NOTE: This static_folder setup means Flask will serve files directly from the 'backend' folder.
-# If your HTML/CSS/JS are in '/frontend', this will need to be adjusted.
-# See the note below the code block for a better way to handle frontend files.
-app = Flask(__name__, static_folder=os.path.dirname(os.path.abspath(__file__)))
+# --- CORRECTED FLASK APP INITIALIZATION ---
+# Get the base directory of your project (one level up from 'backend')
+# On Render, /opt/render/project/src/backend/app.py
+# os.path.abspath(__file__) -> /opt/render/project/src/backend/app.py
+# os.path.dirname(...) -> /opt/render/project/src/backend/
+# os.path.dirname(...) again -> /opt/render/project/src/ (This is your repo root)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Define the paths to your frontend templates and static assets
+# Assuming your HTML files are directly in the 'frontend' folder: /opt/render/project/src/frontend
+TEMPLATE_FOLDER = os.path.join(BASE_DIR, 'frontend')
+# Assuming any other static assets (CSS, JS, images) are also directly in 'frontend': /opt/render/project/src/frontend
+STATIC_FOLDER = os.path.join(BASE_DIR, 'frontend')
+
+# Initialize Flask app with the correct template and static folders
+app = Flask(__name__,
+            template_folder=TEMPLATE_FOLDER,
+            static_folder=STATIC_FOLDER)
+
 
 # --- Helper for async functions in Flask routes ---
 def run_async(func):
@@ -173,22 +192,30 @@ def api_google_auth(decoded_token):
 
 
 # --- Serve Static Frontend Files ---
-# IMPORTANT: This setup `static_folder=os.path.dirname(os.path.abspath(__file__))`
-# means Flask will look for static files (including your HTML) in the 'backend' directory.
-# Since your HTML files are in '/frontend', this needs to be changed.
-# See the suggestion below for how to correctly serve files from '/frontend'.
-
+# This route will serve login.html from the 'frontend' directory
 @app.route('/')
 def serve_login():
-    # If using the recommended setup for static/template folders (see below),
-    # this would be render_template('login.html')
-    return send_from_directory(app.static_folder, 'login.html')
+    return render_template('login.html')
 
-@app.route('/<path:filename>')
-def serve_static_files(filename):
-    # If using the recommended setup, Flask would handle this automatically
-    # or you'd use send_from_directory with the correct path.
+# This route will serve other HTML files from the 'frontend' directory
+@app.route('/<string:page_name>.html')
+def serve_html_pages(page_name):
+    # This allows direct access to home.html, register.html, email_verification.html etc.
+    # e.g., /home.html, /register.html
+    return render_template(f'{page_name}.html')
+
+# This route will serve other static files like CSS, JS, images from the 'frontend' directory
+# For example, if you have /frontend/style.css, it can be accessed via /static/style.css
+# If your frontend has a 'static' subfolder (e.g., /frontend/static/css/main.css),
+# Flask will automatically serve it at /static/css/main.css.
+# If your static files are directly in 'frontend' (e.g., /frontend/my_script.js),
+# you can link to them in HTML as /static/my_script.js
+@app.route('/static/<path:filename>')
+def serve_static(filename):
     return send_from_directory(app.static_folder, filename)
 
+
 if __name__ == "__main__":
+    # When running locally, Flask will use port 5000 by default.
+    # On Render, Gunicorn will handle the port, typically 10000.
     app.run(debug=False, host="0.0.0.0", port=5000)
