@@ -3,7 +3,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 from functools import wraps
 from firebase_admin import auth
-from auth_service import (
+from .auth_service import (
     check_username_uniqueness_backend,
     register_user_backend,
     send_otp_to_email_backend,
