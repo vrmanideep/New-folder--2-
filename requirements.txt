@@ -1,5 +1,0 @@
-Flask
-firebase-admin
-sendgrid
-requests
-gunicorn
