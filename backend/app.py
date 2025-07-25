@@ -1,4 +1,4 @@
-# app.py
+# backend/app.py
 
 from flask import Flask, request, jsonify, send_from_directory
 from functools import wraps
@@ -15,12 +15,14 @@ from .auth_service import (
     update_user_address_backend,
     handle_google_auth_backend # Import the new Google auth function
 )
-from .firebase_config import FIREBASE_CLIENT_CONFIG
-import firebase_config
+from . import firebase_config # Corrected import
 import os
 import asyncio
 
 # Initialize Flask app, explicitly setting the static folder to the current directory
+# NOTE: This static_folder setup means Flask will serve files directly from the 'backend' folder.
+# If your HTML/CSS/JS are in '/frontend', this will need to be adjusted.
+# See the note below the code block for a better way to handle frontend files.
 app = Flask(__name__, static_folder=os.path.dirname(os.path.abspath(__file__)))
 
 # --- Helper for async functions in Flask routes ---
@@ -66,9 +68,11 @@ def api_firebase_config():
     """
     Endpoint to provide Firebase client-side configuration to the frontend.
     """
-    if FIREBASE_CLIENT_CONFIG.get("apiKey") == "YOUR_WEB_API_KEY":
+    # Corrected usage: prefixed with firebase_config.
+    if firebase_config.FIREBASE_CLIENT_CONFIG.get("apiKey") == "YOUR_WEB_API_KEY":
         return jsonify({"success": False, "message": "Firebase client config not set in firebase_config.py"}), 500
-    return jsonify({"success": True, "config": FIREBASE_CLIENT_CONFIG})
+    # Corrected usage: prefixed with firebase_config.
+    return jsonify({"success": True, "config": firebase_config.FIREBASE_CLIENT_CONFIG})
 
 
 @app.route('/api/check-username', methods=['GET'])
@@ -169,14 +173,22 @@ def api_google_auth(decoded_token):
 
 
 # --- Serve Static Frontend Files ---
+# IMPORTANT: This setup `static_folder=os.path.dirname(os.path.abspath(__file__))`
+# means Flask will look for static files (including your HTML) in the 'backend' directory.
+# Since your HTML files are in '/frontend', this needs to be changed.
+# See the suggestion below for how to correctly serve files from '/frontend'.
+
 @app.route('/')
 def serve_login():
+    # If using the recommended setup for static/template folders (see below),
+    # this would be render_template('login.html')
     return send_from_directory(app.static_folder, 'login.html')
 
 @app.route('/<path:filename>')
 def serve_static_files(filename):
+    # If using the recommended setup, Flask would handle this automatically
+    # or you'd use send_from_directory with the correct path.
     return send_from_directory(app.static_folder, filename)
 
 if __name__ == "__main__":
     app.run(debug=False, host="0.0.0.0", port=5000)
-
