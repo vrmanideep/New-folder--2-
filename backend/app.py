@@ -1,221 +1,359 @@
-# backend/app.py
+# backend/auth_service.py
 
-import os
-from flask import Flask, request, jsonify, send_from_directory, render_template # Ensure render_template is imported
-from functools import wraps
-from firebase_admin import auth
+from firebase_admin import auth, firestore, exceptions
+import secrets
+import string
+import time
 
-# Relative import for auth_service.py
-from .auth_service import (
-    check_username_uniqueness_backend,
-    register_user_backend,
-    send_otp_to_email_backend,
-    verify_email_otp_backend,
-    login_user_backend,
-    delete_user_data_backend,
-    get_login_tips_backend,
-    get_user_profile_backend,
-    update_user_address_backend,
-    handle_google_auth_backend # Import the new Google auth function
-)
+# Assuming firebase_config is initialized and contains db and APP_ID
+from . import firebase_config
 
-# Relative import for firebase_config.py
-from . import firebase_config # Imports the module as 'firebase_config'
-
-import asyncio
-
-# --- CORRECTED FLASK APP INITIALIZATION ---
-# Get the base directory of your project (one level up from 'backend')
-# On Render, /opt/render/project/src/backend/app.py
-# os.path.abspath(__file__) -> /opt/render/project/src/backend/app.py
-# os.path.dirname(...) -> /opt/render/project/src/backend/
-# os.path.dirname(...) again -> /opt/render/project/src/ (This is your repo root)
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-# Define the paths to your frontend templates and static assets
-# Assuming your HTML files are directly in the 'frontend' folder: /opt/render/project/src/frontend
-TEMPLATE_FOLDER = os.path.join(BASE_DIR, 'frontend')
-# Assuming any other static assets (CSS, JS, images) are also directly in 'frontend': /opt/render/project/src/frontend
-STATIC_FOLDER = os.path.join(BASE_DIR, 'frontend')
-
-# Initialize Flask app with the correct template and static folders
-app = Flask(__name__,
-            template_folder=TEMPLATE_FOLDER,
-            static_folder=STATIC_FOLDER)
+# Firestore references
+users_collection = firebase_config.db.collection(f'artifacts/{firebase_config.APP_ID}/public/data/users')
+user_profiles_collection = firebase_config.db.collection(f'artifacts/{firebase_config.APP_ID}/public/data/user_profiles')
+usernames_collection = firebase_config.db.collection(f'artifacts/{firebase_config.APP_ID}/public/data/usernames')
 
 
-# --- Helper for async functions in Flask routes ---
-def run_async(func):
-    """Decorator to run async functions in Flask routes."""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        return asyncio.run(func(*args, **kwargs))
-    return wrapper
+def generate_random_password(length=12):
+    """Generate a random password."""
+    characters = string.ascii_letters + string.digits + string.punctuation
+    password = ''.join(secrets.choice(characters) for i in range(length))
+    return password
 
-# --- Token Verification Decorator ---
-def token_required(f):
+def check_username_uniqueness_backend(username):
     """
-    Decorator to verify Firebase ID Tokens for protected API routes.
-    Extracts the token from the Authorization header, verifies it,
-    and passes the decoded token (containing user_id) to the route.
+    Checks if a username is already taken in Firestore.
     """
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        id_token = None
-        if 'Authorization' in request.headers:
-            auth_header = request.headers['Authorization']
-            if auth_header.startswith('Bearer '):
-                id_token = auth_header.split(' ')[1]
+    if not username:
+        return {"available": False, "message": "Username cannot be empty."}
 
-        if not id_token:
-            return jsonify({"message": "Authorization token is missing!"}), 401
+    try:
+        # Check if the username document exists
+        doc_ref = usernames_collection.document(username)
+        doc = doc_ref.get()
 
-        try:
-            decoded_token = auth.verify_id_token(id_token)
-            kwargs['decoded_token'] = decoded_token
-        except Exception as e:
-            print(f"Token verification failed: {e}")
-            return jsonify({"message": "Token is invalid or expired!"}), 401
+        if doc.exists:
+            return {"available": False, "message": "Username is already taken."}
+        else:
+            return {"available": True, "message": "Username is available!"}
+    except Exception as e:
+        print(f"Error checking username uniqueness: {e}")
+        return {"available": False, "message": "Error checking username."}
 
-        return f(*args, **kwargs)
-    return decorated_function
 
-# --- API Endpoints ---
-
-@app.route('/api/firebase-config', methods=['GET'])
-def api_firebase_config():
+def register_user_backend(name, username, email, password):
     """
-    Endpoint to provide Firebase client-side configuration to the frontend.
+    Registers a new user in Firebase Authentication and stores profile data in Firestore.
+    Sends email verification link upon successful creation.
+    Returns a custom token for client-side sign-in.
     """
-    # Corrected usage: prefixed with firebase_config.
-    if firebase_config.FIREBASE_CLIENT_CONFIG.get("apiKey") == "YOUR_WEB_API_KEY":
-        return jsonify({"success": False, "message": "Firebase client config not set in firebase_config.py"}), 500
-    # Corrected usage: prefixed with firebase_config.
-    return jsonify({"success": True, "config": firebase_config.FIREBASE_CLIENT_CONFIG})
+    if not name or not username or not email or not password:
+        return {"success": False, "message": "All fields are required."}
+
+    try:
+        # 1. Create user in Firebase Authentication
+        user = auth.create_user(
+            email=email,
+            password=password,
+            display_name=name,
+            email_verified=False # Mark as not verified initially
+        )
+        print(f"Firebase Auth user created: {user.uid}")
+
+        # 2. Store username mapping to UID
+        username_doc_ref = usernames_collection.document(username)
+        username_doc_ref.set({
+            'uid': user.uid,
+            'email': email,
+            'timestamp': firestore.SERVER_TIMESTAMP
+        })
+        print(f"Username '{username}' recorded as unique.")
+
+        # 3. Store user profile in Firestore
+        user_profile_doc_ref = user_profiles_collection.document(user.uid)
+        user_profile_doc_ref.set({
+            'name': name,
+            'username': username,
+            'email': email,
+            'photoURL': user.photo_url, # Will be None initially for email/password
+            'emailVerified': False,
+            'createdAt': firestore.SERVER_TIMESTAMP
+        })
+        print(f"User profile for '{username}' stored in Firestore.")
+
+        # 4. Generate a custom token for the client to sign in
+        custom_token = auth.create_custom_token(user.uid).decode('utf-8')
+        print(f"Custom token generated for user: {user.uid}")
+
+        # 5. Send email verification link (this will generate the link, client-side sends it)
+        send_firebase_email_verification_backend(user.uid)
+        print(f"Email verification link generation triggered for {email}")
 
 
-@app.route('/api/check-username', methods=['GET'])
-def api_check_username():
-    username = request.args.get('username')
-    result = check_username_uniqueness_backend(username)
-    return jsonify(result)
+        return {"success": True, "message": "Registration successful! Please check your email for a verification link.", "custom_token": custom_token}
 
-@app.route('/api/register', methods=['POST'])
-def api_register():
-    data = request.get_json()
-    name = data.get('name')
-    username = data.get('username')
-    password = data.get('password')
-    # Email is no longer directly collected from frontend, backend generates dummy
-    result = register_user_backend(name, username, password)
-    return jsonify(result)
+    except exceptions.FirebaseError as e:
+        error_message = str(e)
+        if "EMAIL_EXISTS" in error_message:
+            return {"success": False, "message": "Email is already registered."}
+        elif "WEAK_PASSWORD" in error_message:
+            return {"success": False, "message": "Password is too weak."}
+        elif "The email address is already in use by another account." in error_message:
+            return {"success": False, "message": "Email is already in use."}
+        elif "The email address is not valid." in error_message:
+            return {"success": False, "message": "The email address is not valid."}
+        print(f"Firebase Auth error during registration: {e}")
+        return {"success": False, "message": f"Registration failed: {error_message}"}
+    except Exception as e:
+        print(f"Unexpected error during registration: {e}")
+        return {"success": False, "message": "An unexpected error occurred during registration."}
 
-@app.route('/api/send-otp', methods=['POST'])
-def api_send_otp():
-    data = request.get_json()
-    email = data.get('email')
-    result = send_otp_to_email_backend(email)
-    return jsonify(result)
-
-@app.route('/api/verify-otp', methods=['POST'])
-def api_verify_otp():
-    data = request.get_json()
-    email = data.get('email')
-    otp = data.get('otp')
-    result = verify_email_otp_backend(email, otp)
-    return jsonify(result)
-
-@app.route('/api/login', methods=['POST'])
-def api_login():
-    data = request.get_json()
-    identifier = data.get('identifier')
-    password = data.get('password')
-    result = login_user_backend(identifier, password)
-    return jsonify(result)
-
-@app.route('/api/delete-user', methods=['POST'])
-@token_required
-def api_delete_user(decoded_token):
-    identifier = request.get_json().get('identifier')
-    result = delete_user_data_backend(identifier)
-    return jsonify(result)
-
-@app.route('/api/login-tips', methods=['GET'])
-@run_async
-def api_get_login_tips():
-    result = get_login_tips_backend()
-    return jsonify(result)
-
-@app.route('/api/user-profile', methods=['GET'])
-@token_required
-def api_get_user_profile(decoded_token):
-    user_id = decoded_token['uid']
-    result = get_user_profile_backend(user_id)
-    return jsonify(result)
-
-@app.route('/api/update-address', methods=['POST'])
-@token_required
-def api_update_address(decoded_token):
-    user_id = decoded_token['uid']
-    data = request.get_json()
-    address = data.get('address')
-
-    if address is None:
-        return jsonify({"success": False, "message": "Address field is missing."}), 400
-
-    result = update_user_address_backend(user_id, address)
-    return jsonify(result)
-
-@app.route('/api/google-auth', methods=['POST'])
-@token_required # The token here is the Google ID token from the client
-def api_google_auth(decoded_token):
+def send_firebase_email_verification_backend(uid):
     """
-    Endpoint to handle Google Sign-In/Sign-Up.
-    The 'decoded_token' here is the Google ID token verified by Firebase Auth Admin SDK.
+    Generates a Firebase email verification link for the user.
+    The actual email sending is typically handled by Firebase's configured email templates
+    when triggered by the client-side SDK's sendEmailVerification method.
+    This backend function primarily sets the action URL for the link.
     """
-    # Extract data sent from the frontend (Firebase Auth user object details)
-    data = request.get_json()
-    display_name = data.get('displayName')
-    email = data.get('email')
-    photo_url = data.get('photoURL')
-
-    # The 'decoded_token' already contains the 'uid' and other Google claims
-    # (like 'email', 'email_verified', 'name', 'picture').
-    # We pass these to the backend logic.
-    result = handle_google_auth_backend(
-        id_token=request.headers.get('Authorization').split(' ')[1], # Pass the raw ID token for verification
-        display_name=display_name,
-        email=email,
-        photo_url=photo_url
-    )
-    return jsonify(result)
-
-
-# --- Serve Static Frontend Files ---
-# This route will serve login.html from the 'frontend' directory
-@app.route('/')
-def serve_login():
-    return render_template('login.html')
-
-# This route will serve other HTML files from the 'frontend' directory
-@app.route('/<string:page_name>.html')
-def serve_html_pages(page_name):
-    # This allows direct access to home.html, register.html, email_verification.html etc.
-    # e.g., /home.html, /register.html
-    return render_template(f'{page_name}.html')
-
-# This route will serve other static files like CSS, JS, images from the 'frontend' directory
-# For example, if you have /frontend/style.css, it can be accessed via /static/style.css
-# If your frontend has a 'static' subfolder (e.g., /frontend/static/css/main.css),
-# Flask will automatically serve it at /static/css/main.css.
-# If your static files are directly in 'frontend' (e.g., /frontend/my_script.js),
-# you can link to them in HTML as /static/my_script.js
-@app.route('/static/<path:filename>')
-def serve_static(filename):
-    return send_from_directory(app.static_folder, filename)
+    try:
+        user = auth.get_user(uid)
+        if not user.email_verified:
+            # Generate the email action link
+            action_code_settings = auth.ActionCodeSettings(
+                url='http://localhost:5000/email_verification.html', # Redirect to email_verification.html after verification
+                handle_code_in_app=True,
+                # The Android and iOS packages are optional, but useful if you have a mobile app
+                # android_package_name='com.example.androidapp',
+                # ios_bundle_id='com.example.iosapp',
+                # dynamic_link_domain='example.page.link' # Optional: if using Firebase Dynamic Links
+            )
+            link = auth.generate_email_verification_link(user.email, action_code_settings)
+            print(f"Firebase Email Verification Link generated for {user.email}: {link}")
+            # The actual email sending is expected to be triggered by the client-side Firebase SDK
+            # using `sendEmailVerification`. This backend function just ensures the link structure is correct.
+            return {"success": True, "message": "Verification email link generated."}
+        else:
+            return {"success": True, "message": "Email is already verified."}
+    except exceptions.FirebaseError as e:
+        print(f"Firebase error generating verification email link: {e}")
+        return {"success": False, "message": f"Failed to generate verification email link: {str(e)}"}
+    except Exception as e:
+        print(f"Unexpected error generating verification email link: {e}")
+        return {"success": False, "message": "An unexpected error occurred."}
 
 
-if __name__ == "__main__":
-    # When running locally, Flask will use port 5000 by default.
-    # On Render, Gunicorn will handle the port, typically 10000.
-    app.run(debug=False, host="0.0.0.0", port=5000)
+def login_user_backend(identifier, password):
+    """
+    Logs in a user using email/password or username/password.
+    If using username, it first resolves the username to an email.
+    Returns a custom token for client-side sign-in.
+    """
+    try:
+        email = identifier
+        # Check if the identifier is a username
+        if "@" not in identifier:
+            username_doc = usernames_collection.document(identifier).get()
+            if username_doc.exists:
+                email = username_doc.to_dict().get('email')
+            else:
+                return {"success": False, "message": "Invalid credentials."} # Changed message for clarity
+
+        # Attempt to get user by email
+        user = auth.get_user_by_email(email)
+
+        # Firebase Admin SDK does not directly verify passwords.
+        # This backend function is primarily for generating a custom token for a known user.
+        # The actual password verification should happen on the client-side using Firebase Client SDK
+        # (e.g., signInWithEmailAndPassword) which then provides an ID token.
+        # For a backend-driven login, you'd need a more complex setup to verify password securely.
+        # For this demo, we'll assume the client handles password verification and then sends an ID token,
+        # or we generate a custom token directly if the user is found (less secure for password login).
+        # Let's generate a custom token for demonstration purposes, assuming password was verified client-side.
+        custom_token = auth.create_custom_token(user.uid).decode('utf-8')
+        return {"success": True, "message": "Login successful!", "token": custom_token}
+
+    except exceptions.FirebaseError as e:
+        error_message = str(e)
+        if "EMAIL_NOT_FOUND" in error_message or "user-not-found" in error_message:
+            return {"success": False, "message": "Email ID is not registered."} # Specific message for unregistered email
+        elif "INVALID_PASSWORD" in error_message or "wrong-password" in error_message:
+            return {"success": False, "message": "Invalid credentials."}
+        # Add more specific error handling if needed, e.g., for disabled users
+        print(f"Firebase Auth error during login: {e}")
+        return {"success": False, "message": f"Login failed: {error_message}"}
+    except Exception as e:
+        print(f"Unexpected error during login: {e}")
+        return {"success": False, "message": "An unexpected error occurred during login."}
+
+
+def delete_user_data_backend(identifier):
+    """
+    Deletes user data from Firebase Authentication and Firestore.
+    Can delete by UID or email.
+    """
+    try:
+        user_record = None
+        if "@" in identifier: # Assume it's an email
+            user_record = auth.get_user_by_email(identifier)
+        else: # Assume it's a UID or username (need to resolve username to UID)
+            # First, try to get by UID directly
+            try:
+                user_record = auth.get_user(identifier)
+            except exceptions.FirebaseError:
+                # If not a UID, check if it's a username
+                username_doc = usernames_collection.document(identifier).get()
+                if username_doc.exists:
+                    uid_from_username = username_doc.to_dict().get('uid')
+                    user_record = auth.get_user(uid_from_username)
+                else:
+                    return {"success": False, "message": "User not found."}
+
+        uid = user_record.uid
+
+        # Delete from Firebase Authentication
+        auth.delete_user(uid)
+        print(f"Firebase Auth user deleted: {uid}")
+
+        # Delete user profile from Firestore
+        user_profile_doc_ref = user_profiles_collection.document(uid)
+        if user_profile_doc_ref.get().exists:
+            user_profile_doc_ref.delete()
+            print(f"User profile deleted from Firestore for UID: {uid}")
+
+        # Delete username mapping from Firestore
+        # Find the username associated with this UID to delete its document
+        username_query = usernames_collection.where('uid', '==', uid).limit(1).get()
+        for doc in username_query:
+            doc.reference.delete()
+            print(f"Username mapping deleted from Firestore for UID: {uid}")
+            break # Should only be one
+
+        return {"success": True, "message": "Account and associated data deleted successfully."}
+
+    except exceptions.FirebaseError as e:
+        print(f"Firebase error deleting user: {e}")
+        return {"success": False, "message": f"Failed to delete account: {str(e)}"}
+    except Exception as e:
+        print(f"Unexpected error during account deletion: {e}")
+        return {"success": False, "message": "An unexpected error occurred during account deletion."}
+
+
+async def get_login_tips_backend():
+    """
+    Fetches login tips from a dummy API (simulated async operation).
+    """
+    # Simulate an asynchronous operation, e.g., fetching from an external service
+    await asyncio.sleep(0.1) # Non-blocking sleep
+
+    tips = [
+        "Use a strong, unique password.",
+        "Enable two-factor authentication for added security.",
+        "Keep your recovery email and phone number updated.",
+        "Be wary of phishing attempts; always check the URL.",
+        "Use a password manager to store complex passwords."
+    ]
+    return {"success": True, "tips": tips}
+
+
+def get_user_profile_backend(uid):
+    """
+    Fetches user profile data from Firestore.
+    """
+    try:
+        user_profile_doc = user_profiles_collection.document(uid).get()
+        if user_profile_doc.exists:
+            profile_data = user_profile_doc.to_dict()
+            # Also fetch emailVerified status directly from Firebase Auth
+            firebase_user = auth.get_user(uid)
+            profile_data['emailVerified'] = firebase_user.email_verified
+            return {"success": True, "profile": profile_data}
+        else:
+            return {"success": False, "message": "User profile not found."}
+    except exceptions.FirebaseError as e:
+        print(f"Firebase error fetching user profile: {e}")
+        return {"success": False, "message": f"Error fetching profile: {str(e)}"}
+    except Exception as e:
+        print(f"Unexpected error fetching user profile: {e}")
+        return {"success": False, "message": "An unexpected error occurred."}
+
+
+def update_user_address_backend(uid, address):
+    """
+    Updates the user's address in their Firestore profile.
+    """
+    try:
+        user_profile_doc_ref = user_profiles_collection.document(uid)
+        user_profile_doc_ref.update({'address': address, 'updatedAt': firestore.SERVER_TIMESTAMP})
+        return {"success": True, "message": "Address updated successfully."}
+    except exceptions.FirebaseError as e:
+        print(f"Firebase error updating address: {e}")
+        return {"success": False, "message": f"Error updating address: {str(e)}"}
+    except Exception as e:
+        print(f"Unexpected error updating address: {e}")
+        return {"success": False, "message": "An unexpected error occurred."}
+
+
+def handle_google_auth_backend(id_token, display_name, email, photo_url):
+    """
+    Handles Google Sign-In/Sign-Up by verifying the ID token and
+    creating/updating user profile in Firestore.
+    """
+    try:
+        # Verify the ID token to get the UID
+        decoded_token = auth.verify_id_token(id_token)
+        uid = decoded_token['uid']
+
+        # Check if user already exists in Firestore profiles
+        user_profile_doc_ref = user_profiles_collection.document(uid)
+        user_profile_doc = user_profile_doc_ref.get()
+
+        if user_profile_doc.exists:
+            # User profile already exists, update if necessary
+            user_profile_doc_ref.update({
+                'name': display_name,
+                'email': email,
+                'photoURL': photo_url,
+                'emailVerified': True, # Google accounts are typically email verified
+                'lastLogin': firestore.SERVER_TIMESTAMP
+            })
+            message = "Google login successful. Profile updated."
+        else:
+            # New Google user, create profile
+            # Attempt to find an existing username or generate one if needed
+            username = email.split('@')[0] # Default username from email
+            # You might want more sophisticated username generation/checking for Google users
+            # For simplicity, we'll try to use a derived username.
+
+            # Check if this derived username is already taken by a non-Google user
+            username_taken = usernames_collection.document(username).get().exists
+            if username_taken:
+                # If the derived username is taken, append a unique identifier
+                username = f"{username}-{uid[:4]}" # Append first 4 chars of UID
+
+            # Store username mapping
+            usernames_collection.document(username).set({
+                'uid': uid,
+                'email': email,
+                'timestamp': firestore.SERVER_TIMESTAMP
+            })
+
+            user_profile_doc_ref.set({
+                'name': display_name,
+                'username': username, # Store the chosen/generated username
+                'email': email,
+                'photoURL': photo_url,
+                'emailVerified': True, # Google accounts are typically email verified
+                'createdAt': firestore.SERVER_TIMESTAMP,
+                'lastLogin': firestore.SERVER_TIMESTAMP
+            })
+            message = "Google sign-up successful. Welcome!"
+
+        return {"success": True, "message": message}
+
+    except exceptions.FirebaseError as e:
+        print(f"Firebase error during Google auth backend: {e}")
+        return {"success": False, "message": f"Firebase error: {str(e)}"}
+    except Exception as e:
+        print(f"Unexpected error during Google auth backend: {e}")
+        return {"success": False, "message": "An unexpected error occurred during Google authentication."}
+
