@@ -6,6 +6,8 @@
     <title>Register Page</title>
     <!-- Tailwind CSS CDN for easy styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -28,8 +30,8 @@
             max-width: 450px; /* Slightly wider for more content */
             text-align: center;
             border: 1px solid rgba(255, 255, 255, 0.3);
-            backdrop-filter: blur(5px);
             -webkit-backdrop-filter: blur(5px);
+            backdrop-filter: blur(5px);
         }
 
         .register-container h2 {
@@ -92,6 +94,13 @@
             box-shadow: 0 2px 5px rgba(245, 87, 108, 0.2);
         }
 
+        .register-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
         .login-link {
             margin-top: 1.5rem;
             color: #666;
@@ -118,6 +127,7 @@
         .message.success { color: #28a745; }
         .message.error { color: #dc3545; }
         .message.info { color: #007bff; }
+        .message.warning { color: #ffc107; }
 
         /* Username availability styles */
         .username-status {
@@ -167,7 +177,7 @@
             width: 100%;
             padding: 0.85rem 1rem;
             margin-top: 1rem;
-            background-color: #4285F4; /* Google Blue */
+            background-color: #092553; /* Google Blue */
             color: white;
             border: none;
             border-radius: 0.75rem;
@@ -185,6 +195,12 @@
         .google-signin-button:active {
             transform: translateY(0);
             box-shadow: 0 2px 5px rgba(66, 133, 244, 0.2);
+        }
+        .google-signin-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
         }
         .google-signin-button img {
             margin-right: 0.75rem;
@@ -230,7 +246,10 @@
                 <input type="text" id="username" name="username" placeholder="Choose a username" required>
                 <p id="username-status" class="username-status"></p>
             </div>
-            <!-- Email input field removed as per user request -->
+            <div class="input-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" placeholder="Enter your email address" required>
+            </div>
             <div class="input-group">
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password" placeholder="Create a password" required>
@@ -238,6 +257,10 @@
                     <div id="password-strength-indicator" class="password-strength-indicator"></div>
                 </div>
                 <p id="password-strength-text" class="password-strength-text"></p>
+            </div>
+            <div class="input-group">
+                <label for="confirm-password">Confirm Password</label>
+                <input type="password" id="confirm-password" name="confirm-password" placeholder="Confirm your password" required>
             </div>
             <button type="submit" class="register-button">Register</button>
             <p id="register-message" class="message"></p>
@@ -261,11 +284,34 @@
     <script type="module">
         // Import Firebase SDK modules
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
         // Placeholder for Firebase client configuration (will be fetched from backend)
         let firebaseClientConfig = {};
         let firebaseAuthInstance; // Store the auth instance
+
+        // Custom message box function (replaces alert)
+        function showMessageBox(message, type = 'info') {
+            const messageBox = document.createElement('div');
+            messageBox.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white z-[3000]`;
+            
+            let bgColor = '';
+            if (type === 'success') {
+                bgColor = 'bg-green-500';
+            } else if (type === 'error') {
+                bgColor = 'bg-red-500';
+            } else {
+                bgColor = 'bg-blue-500';
+            }
+            messageBox.classList.add(bgColor);
+            
+            messageBox.textContent = message;
+            document.body.appendChild(messageBox);
+
+            setTimeout(() => {
+                messageBox.remove();
+            }, 3000); // Message disappears after 3 seconds
+        }
 
         // Function to fetch client config from backend
         async function fetchFirebaseClientConfig() {
@@ -283,8 +329,10 @@
                     onAuthStateChanged(firebaseAuthInstance, (user) => {
                         if (user) {
                             console.log("Firebase Auth State Changed: User is logged in.", user.uid);
-                            // No need to store userId in localStorage here, Firebase SDK manages it.
-                            // The home.html will check Firebase Auth state directly.
+                            // If user is already logged in, redirect to home.html
+                            if (window.location.pathname.includes('register.html') && user.emailVerified) {
+                                window.location.href = 'home.html';
+                            }
                         } else {
                             console.log("Firebase Auth State Changed: User is logged out.");
                             // If user is on a protected page and logs out, redirect to login
@@ -296,13 +344,11 @@
 
                 } else {
                     console.error("Failed to fetch Firebase client config:", config.message);
-                    registerMessage.textContent = "Error: Could not initialize Firebase. Please try again.";
-                    registerMessage.classList.add('error');
+                    showMessageBox("Error: Could not initialize Firebase. Please try again.", "error");
                 }
             } catch (error) {
                 console.error("Network error fetching Firebase client config:", error);
-                registerMessage.textContent = "Network error: Could not initialize Firebase.";
-                registerMessage.classList.add('error');
+                showMessageBox("Network error: Could not initialize Firebase.", "error");
             }
         }
 
@@ -313,12 +359,15 @@
         const registerForm = document.getElementById('register-form');
         const nameInput = document.getElementById('name');
         const usernameInput = document.getElementById('username');
+        const emailInput = document.getElementById('email');
         const passwordInput = document.getElementById('password');
+        const confirmPasswordInput = document.getElementById('confirm-password');
+        const registerButton = registerForm.querySelector('.register-button');
         const registerMessage = document.getElementById('register-message');
         const usernameStatus = document.getElementById('username-status');
         const passwordStrengthIndicator = document.getElementById('password-strength-indicator');
         const passwordStrengthText = document.getElementById('password-strength-text');
-        const googleSignInButton = document.getElementById('google-signin-button'); // New button reference
+        const googleSignInButton = document.getElementById('google-signin-button');
 
         let usernameCheckTimeout;
         const doneTypingInterval = 800; // milliseconds
@@ -396,31 +445,44 @@
 
             const name = nameInput.value.trim();
             const username = usernameInput.value.trim();
+            const email = emailInput.value.trim();
             const password = passwordInput.value.trim();
+            const confirmPassword = confirmPasswordInput.value.trim();
 
             registerMessage.textContent = '';
             registerMessage.className = 'message';
 
-            if (!name || !username || !password) {
+            if (!name || !username || !email || !password || !confirmPassword) {
                 registerMessage.textContent = 'All fields are required.';
                 registerMessage.classList.add('error');
+                showMessageBox('All fields are required.', 'error');
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                registerMessage.textContent = 'Passwords do not match.';
+                registerMessage.classList.add('error');
+                showMessageBox('Passwords do not match.', 'error');
                 return;
             }
 
             if (!isUsernameAvailable) {
                 registerMessage.textContent = 'Please choose an available username before registering.';
                 registerMessage.classList.add('error');
+                showMessageBox('Please choose an available username before registering.', 'error');
                 return;
             }
 
             registerMessage.textContent = 'Registering...';
             registerMessage.classList.add('info');
+            registerButton.disabled = true;
+            googleSignInButton.disabled = true;
 
             try {
                 const response = await fetch('/api/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, username, password }),
+                    body: JSON.stringify({ name, username, email, password }),
                 });
 
                 const result = await response.json();
@@ -428,17 +490,31 @@
                 if (response.ok && result.success) {
                     registerMessage.textContent = result.message;
                     registerMessage.classList.add('success');
+                    showMessageBox(result.message, 'success');
+
+                    // Sign in the user with the custom token received from the backend
+                    if (result.custom_token && firebaseAuthInstance) {
+                        await signInWithCustomToken(firebaseAuthInstance, result.custom_token);
+                        console.log("Signed in with custom token after registration.");
+                    }
+
+                    // Redirect to email verification page, passing email as a query parameter
                     setTimeout(() => {
-                        window.location.href = 'email_verification.html';
+                        window.location.href = `email_verification.html?email=${encodeURIComponent(email)}`;
                     }, 1500);
                 } else {
                     registerMessage.textContent = result.message || 'Registration failed. Please try again.';
                     registerMessage.classList.add('error');
+                    showMessageBox(result.message || 'Registration failed. Please try again.', 'error');
                 }
             } catch (error) {
                 console.error('Network error during registration:', error);
                 registerMessage.textContent = 'Network error. Please try again later.';
                 registerMessage.classList.add('error');
+                showMessageBox('Network error. Please try again later.', 'error');
+            } finally {
+                registerButton.disabled = false;
+                googleSignInButton.disabled = false;
             }
         });
 
@@ -446,21 +522,22 @@
         googleSignInButton.addEventListener('click', async () => {
             registerMessage.textContent = 'Signing up with Google...';
             registerMessage.className = 'message info';
+            registerButton.disabled = true;
+            googleSignInButton.disabled = true;
 
             try {
                 const provider = new GoogleAuthProvider();
                 const result = await signInWithPopup(firebaseAuthInstance, provider);
                 const user = result.user;
-                const idToken = await user.getIdToken(); // Get the ID token from Google Sign-In
+                const idToken = await user.getIdToken();
 
                 console.log("Google Sign-In successful on client. Sending ID token to backend.");
 
-                // Send the ID token to your Flask backend for verification and profile management
                 const backendResponse = await fetch('/api/google-auth', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${idToken}` // Send Google ID token
+                        'Authorization': `Bearer ${idToken}`
                     },
                     body: JSON.stringify({
                         displayName: user.displayName,
@@ -474,11 +551,14 @@
                 if (backendResponse.ok && backendResult.success) {
                     registerMessage.textContent = backendResult.message;
                     registerMessage.classList.add('success');
-                    window.location.href = 'home.html'; // Redirect after backend confirms
+                    showMessageBox(backendResult.message, 'success');
+                    // For Google Sign-Up, the email is usually already verified or handled differently.
+                    // Redirect directly to home.html or login.html
+                    window.location.href = 'home.html';
                 } else {
                     registerMessage.textContent = backendResult.message || 'Google sign-up failed on server.';
                     registerMessage.classList.add('error');
-                    // Optionally sign out from client-side Firebase if backend fails
+                    showMessageBox(backendResult.message || 'Google sign-up failed on server.', 'error');
                     await firebaseAuthInstance.signOut();
                 }
 
@@ -486,12 +566,18 @@
                 console.error('Google Sign-Up error:', error);
                 if (error.code === 'auth/popup-closed-by-user') {
                     registerMessage.textContent = 'Google sign-up cancelled.';
+                    showMessageBox('Google sign-up cancelled.', 'info');
                 } else if (error.code) {
                     registerMessage.textContent = `Google Sign-Up Error: ${error.message}`;
+                    showMessageBox(`Google Sign-Up Error: ${error.message}`, 'error');
                 } else {
                     registerMessage.textContent = 'Network error during Google sign-up. Please try again.';
+                    showMessageBox('Network error during Google sign-up. Please try again.', 'error');
                 }
                 registerMessage.classList.add('error');
+            } finally {
+                registerButton.disabled = false;
+                googleSignInButton.disabled = false;
             }
         });
     </script>
