@@ -6,44 +6,135 @@
     <title>Home Page</title>
     <!-- Tailwind CSS CDN for easy styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        /* CSS Variables for Theming */
+        :root {
+            /* Dark Mode Defaults */
+            --bg-color: #0a0a0a;
+            --text-color: #f0f0f0;
+            --navbar-bg: rgba(25, 25, 25, 0.8);
+            --container-bg: rgba(40, 40, 40, 0.7);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --shadow-color: rgba(0, 0, 0, 0.5);
+            --dropdown-bg: rgba(40, 40, 40, 0.95);
+            --dropdown-item-hover-bg: rgba(102, 126, 234, 0.2);
+            --modal-bg: #fff; /* Modal content is always light for contrast */
+            --modal-text-color: #333;
+            --modal-button-cancel-bg: #e2e8f0;
+            --modal-button-cancel-text: #333;
+            --modal-button-cancel-hover-bg: #cbd5e1;
+            --message-text-color: #e0e0e0;
+
+            /* Form specific colors for modals */
+            --input-bg: #f3f4f6;
+            --input-border: #d1d5db;
+            --input-text: #1f2937;
+            --input-placeholder: #6b7280;
+            --label-text: #374151;
+        }
+
+        .light-mode {
+            /* Light Mode Overrides */
+            --bg-color: #f0f2f5;
+            --text-color: #333333;
+            --navbar-bg: rgba(255, 255, 255, 0.9);
+            --container-bg: rgba(255, 255, 255, 0.9);
+            --border-color: rgba(0, 0, 0, 0.1);
+            --shadow-color: rgba(0, 0, 0, 0.1);
+            --dropdown-bg: rgba(255, 255, 255, 0.95);
+            --dropdown-item-hover-bg: rgba(102, 126, 234, 0.1);
+            /* Modal colors remain the same as they are already light */
+            --message-text-color: #333; /* For messages on light background */
+
+            /* Form specific colors for modals - no change needed as they are already light */
+        }
+
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #0a0a0a; /* Very dark grey / almost black background */
-            color: #f0f0f0; /* Light text for contrast */
+            background-color: var(--bg-color);
+            color: var(--text-color);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            transition: background-color 0.3s ease, color 0.3s ease; /* Smooth theme transition */
         }
 
         .navbar {
-            background-color: rgba(25, 25, 25, 0.8); /* Slightly lighter dark for navbar */
-            backdrop-filter: blur(8px); /* Frosted glass effect */
+            background-color: var(--navbar-bg);
             -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(8px);
             padding: 1rem 2rem;
             display: flex;
-            justify-content: space-between;
+            justify-content: space-between; /* Distributes items along the main axis */
             align-items: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1); /* Subtle separator */
+            border-bottom: 1px solid var(--border-color);
             position: sticky;
             top: 0;
             z-index: 1000;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+
+        .navbar-logo-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem; /* Space between logo and username */
         }
 
         .logo-img {
-            height: 40px; /* Adjust as needed */
-            width: auto;
-            border-radius: 0.5rem; /* Slightly rounded corners for the logo image */
+            height: 40px;
+            width: 40px; /* Ensure width matches height for perfect circle */
+            border-radius: 50%; /* Makes the logo circular */
+            object-fit: cover; /* Ensures image covers the circle without distortion */
+            border: 2px solid #667eea; /* Add a border for visual appeal */
+            box-shadow: 0 0 8px rgba(102, 126, 234, 0.5);
         }
 
-        /* User Button and Dropdown Styles */
+        .navbar-username {
+            font-weight: 600;
+            color: var(--text-color);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem; /* Space between navigation items */
+            margin: 0 auto; /* Center the navigation links */
+        }
+
+        .nav-link {
+            color: var(--text-color);
+            text-decoration: none;
+            font-weight: 500;
+            padding: 0.5rem 0;
+            position: relative;
+            transition: color 0.2s ease;
+        }
+
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 2px;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #667eea; /* Accent color for underline */
+            transition: width 0.3s ease-in-out;
+        }
+
+        .nav-link:hover::after {
+            width: 100%;
+        }
+
+
         .user-menu-container {
             position: relative;
             display: inline-block;
-            z-index: 1001; /* Ensure dropdown is above other content */
+            z-index: 1001;
         }
 
         .user-avatar-button {
@@ -54,9 +145,9 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            color: white;
+            color: var(--text-color); /* Use text color variable */
             font-weight: 600;
-            transition: opacity 0.2s ease;
+            transition: opacity 0.2s ease, color 0.3s ease;
         }
 
         .user-avatar-button:hover {
@@ -66,26 +157,26 @@
         .user-avatar-button img {
             width: 40px;
             height: 40px;
-            border-radius: 50%; /* Circular image */
+            border-radius: 50%;
             object-fit: cover;
-            border: 2px solid #667eea; /* Border around avatar */
-            box-shadow: 0 0 8px rgba(102, 126, 234, 0.5); /* Glow effect */
+            border: 2px solid #667eea;
+            box-shadow: 0 0 8px rgba(102, 126, 234, 0.5);
         }
 
         .user-dropdown-menu {
             position: absolute;
-            top: calc(100% + 10px); /* Position below the button */
+            top: calc(100% + 10px);
             right: 0;
-            background-color: rgba(40, 40, 40, 0.95); /* Darker background for dropdown */
+            background-color: var(--dropdown-bg);
             border-radius: 0.75rem;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 8px 20px var(--shadow-color);
             min-width: 200px;
             opacity: 0;
             visibility: hidden;
             transform: translateY(-10px);
-            transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease;
+            transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease, background-color 0.3s ease;
             padding: 0.5rem 0;
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            border: 1px solid var(--border-color);
         }
 
         .user-dropdown-menu.show {
@@ -97,7 +188,7 @@
         .dropdown-item {
             display: block;
             padding: 0.75rem 1.5rem;
-            color: #f0f0f0;
+            color: var(--text-color); /* Use text color variable */
             text-align: left;
             text-decoration: none;
             cursor: pointer;
@@ -105,12 +196,12 @@
         }
 
         .dropdown-item:hover {
-            background-color: rgba(102, 126, 234, 0.2); /* Light highlight on hover */
-            color: #ffffff;
+            background-color: var(--dropdown-item-hover-bg);
+            color: var(--text-color);
         }
 
         .dropdown-item.danger {
-            color: #ef4444; /* Red for delete option */
+            color: #ef4444;
         }
         .dropdown-item.danger:hover {
             background-color: rgba(239, 68, 68, 0.2);
@@ -118,7 +209,7 @@
         }
 
         .main-content {
-            flex-grow: 1; /* Takes up remaining space */
+            flex-grow: 1;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -131,7 +222,8 @@
             font-size: 2.5rem;
             font-weight: 700;
             margin-bottom: 1rem;
-            color: #f0f0f0;
+            color: var(--text-color); /* Use text color variable */
+            transition: color 0.3s ease;
         }
 
         .main-content p {
@@ -139,9 +231,11 @@
             opacity: 0.8;
             max-width: 800px;
             line-height: 1.6;
+            color: var(--text-color); /* Use text color variable */
+            transition: color 0.3s ease;
         }
 
-        /* Modal Styles (re-integrated for Delete Account) */
+        /* Modal Styles */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -152,7 +246,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            z-index: 2000; /* Higher z-index than navbar dropdown */
+            z-index: 2000;
             opacity: 0;
             visibility: hidden;
             transition: opacity 0.3s ease, visibility 0.3s ease;
@@ -161,28 +255,28 @@
             opacity: 1;
             visibility: visible;
         }
-        .modal-content {
-            background-color: #fff;
+        .modal-content, .profile-upload-modal-content, .change-password-modal-content, .profile-details-modal-content, .feedback-modal-content { /* Apply common styles to all modals */
+            background-color: var(--modal-bg);
             padding: 2rem;
             border-radius: 1rem;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 10px 20px var(--shadow-color);
             text-align: center;
             max-width: 400px;
             width: 90%;
-            color: #333;
+            color: var(--modal-text-color);
             transform: translateY(-20px);
             opacity: 0;
-            transition: transform 0.3s ease, opacity 0.3s ease;
+            transition: transform 0.3s ease, opacity 0.3s ease, background-color 0.3s ease, color 0.3s ease;
         }
-        .modal-overlay.show .modal-content {
+        .modal-overlay.show .modal-content, .modal-overlay.show .profile-upload-modal-content, .modal-overlay.show .change-password-modal-content, .modal-overlay.show .profile-details-modal-content, .modal-overlay.show .feedback-modal-content {
             transform: translateY(0);
             opacity: 1;
         }
-        .modal-content h3 {
+        .modal-content h3, .profile-upload-modal-content h3, .change-password-modal-content h3, .profile-details-modal-content h3, .feedback-modal-content h3 {
             font-size: 1.75rem;
             font-weight: 700;
             margin-bottom: 1rem;
-            color: #dc2626;
+            color: var(--modal-text-color); /* Use modal text color */
         }
         .modal-content p {
             margin-bottom: 1.5rem;
@@ -212,32 +306,236 @@
             box-shadow: 0 5px 10px rgba(220, 38, 38, 0.3);
         }
         .modal-button.cancel {
-            background-color: #e2e8f0;
-            color: #333;
+            background-color: var(--modal-button-cancel-bg);
+            color: var(--modal-button-cancel-text);
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
         .modal-button.cancel:hover {
-            background-color: #cbd5e1;
+            background-color: var(--modal-button-cancel-hover-bg);
             transform: translateY(-2px);
             box-shadow: 0 5px 10px rgba(0, 0, 0, 0.1);
         }
-        .status-message { /* Used for modal messages */
+        .status-message {
             margin-top: 1rem;
             font-size: 0.9rem;
             font-weight: 500;
-            color: #e0e0e0; /* Default for dark background */
+            color: var(--message-text-color); /* Use message text color variable */
+            transition: color 0.3s ease;
         }
         .status-message.success { color: #4ade80; }
         .status-message.error { color: #ef4444; }
         .status-message.info { color: #60a5fa; }
 
+        /* Form input styles for modals */
+        .modal-form-group {
+            margin-bottom: 1rem;
+            text-align: left;
+        }
+        .modal-form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--label-text);
+        }
+        .modal-form-group input[type="password"],
+        .modal-form-group textarea { /* Added textarea to form styling */
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--input-border);
+            border-radius: 0.5rem;
+            background-color: var(--input-bg);
+            color: var(--input-text);
+            font-size: 1rem;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .modal-form-group input[type="password"]::placeholder,
+        .modal-form-group textarea::placeholder { /* Added textarea placeholder */
+            color: var(--input-placeholder);
+        }
+        .modal-form-group input[type="password"]:focus,
+        .modal-form-group textarea:focus { /* Added textarea focus */
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
+        }
+        .modal-form-group textarea {
+            min-height: 100px; /* Make textarea larger */
+            resize: vertical; /* Allow vertical resizing */
+        }
+
+
+        /* Profile Picture Upload Modal Styles */
+        .profile-upload-modal-content {
+            max-width: 500px; /* Slightly wider for image preview */
+        }
+        .profile-upload-modal-content .preview-area {
+            margin-top: 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 150px;
+            border: 2px dashed #ccc;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            background-color: #f9f9f9;
+        }
+        .profile-upload-modal-content .preview-area img {
+            max-width: 100%;
+            max-height: 150px;
+            object-fit: contain;
+            border-radius: 0.5rem;
+        }
+        .profile-upload-modal-content input[type="file"] {
+            display: none; /* Hide default file input */
+        }
+        .profile-upload-modal-content .custom-file-upload {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background-color: #667eea;
+            color: white;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            margin-bottom: 1rem;
+        }
+        .profile-upload-modal-content .custom-file-upload:hover {
+            background-color: #5a6ed1;
+        }
+
+        /* Light/Dark Mode Toggle Button */
+        .theme-toggle-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--navbar-bg); /* Use navbar background for consistency */
+            color: var(--text-color); /* Use text color for icon */
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: 0 5px 15px var(--shadow-color);
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+            z-index: 1500; /* Above modals but below critical overlays */
+        }
+        .theme-toggle-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px var(--shadow-color);
+        }
+        .theme-toggle-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 5px var(--shadow-color);
+        }
+
+        /* Profile Details Modal Specific Styles */
+        .profile-details-modal-content {
+            max-width: 450px;
+        }
+        .profile-details-modal-content .profile-info-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #eee;
+        }
+        .profile-details-modal-content .profile-info-item:last-child {
+            border-bottom: none;
+        }
+        .profile-details-modal-content .profile-info-item strong {
+            color: var(--modal-text-color);
+        }
+        .profile-details-modal-content .profile-info-item span {
+            color: #6b7280; /* A slightly subdued text color for values */
+        }
+        .profile-details-modal-content .profile-actions {
+            margin-top: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .profile-details-modal-content .profile-action-button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.3s ease;
+            color: white;
+            background-color: #667eea; /* Primary blue */
+        }
+        .profile-details-modal-content .profile-action-button:hover {
+            background-color: #5a6ed1;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 10px rgba(102, 126, 234, 0.3);
+        }
+        .profile-details-modal-content .profile-action-button.secondary {
+            background-color: #4ade80; /* Green for "Add details" */
+        }
+        .profile-details-modal-content .profile-action-button.secondary:hover {
+            background-color: #22c55e;
+            box-shadow: 0 5px 10px rgba(74, 222, 128, 0.3);
+        }
+
+        /* Styling for the social media icons in the footer */
+        .social-links {
+            display: flex;
+            justify-content: center;
+            gap: 1rem; /* Space between icons */
+            padding: 1rem 0;
+        }
+
+        .social-link {
+            color: var(--text-color); /* Inherit text color for the icon */
+            transition: color 0.2s ease, transform 0.2s ease;
+        }
+
+        .social-link:hover {
+            color: #667eea; /* Accent color on hover */
+            transform: translateY(-2px); /* Slight lift on hover */
+        }
+
+        .social-link svg {
+            width: 24px; /* Adjust size as needed */
+            height: 24px;
+            fill: currentColor; /* Makes the SVG color inherit from its parent (the anchor tag) */
+        }
+
 
         /* Responsive adjustments */
-        @media (max-width: 600px) {
+        @media (max-width: 768px) { /* Adjusted breakpoint for better tablet support */
             .navbar {
+                flex-wrap: wrap; /* Allow items to wrap on smaller screens */
                 padding: 0.75rem 1rem;
             }
+            .navbar-logo-container {
+                width: 100%; /* Take full width on small screens */
+                justify-content: center;
+                margin-bottom: 0.5rem;
+            }
+            .nav-links {
+                width: 100%;
+                justify-content: center;
+                gap: 1rem; /* Reduce gap for smaller screens */
+                margin-top: 0.5rem;
+                margin-bottom: 0.5rem;
+            }
+            .nav-link {
+                font-size: 0.9rem;
+            }
+            .user-menu-container {
+                width: 100%;
+                display: flex;
+                justify-content: center;
+                margin-top: 0.5rem;
+            }
             .logo-img {
-                height: 30px;
+                height: 35px;
+                width: 35px;
             }
             .user-avatar-button img {
                 width: 35px;
@@ -260,11 +558,11 @@
             .main-content p {
                 font-size: 1rem;
             }
-            .modal-content {
+            .modal-content, .profile-upload-modal-content, .change-password-modal-content, .profile-details-modal-content, .feedback-modal-content {
                 padding: 1.5rem;
                 border-radius: 0.75rem;
             }
-            .modal-content h3 {
+            .modal-content h3, .profile-upload-modal-content h3, .change-password-modal-content h3, .profile-details-modal-content h3, .feedback-modal-content h3 {
                 font-size: 1.5rem;
             }
             .modal-content p {
@@ -274,21 +572,40 @@
                 padding: 0.6rem 1.2rem;
                 font-size: 0.9rem;
             }
+            .theme-toggle-button {
+                width: 45px;
+                height: 45px;
+                font-size: 1.3rem;
+                bottom: 15px;
+                right: 15px;
+            }
+            .profile-details-modal-content .profile-info-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
         }
     </style>
 </head>
 <body>
     <nav class="navbar">
-        <div class="logo">
-            <img src="https://placehold.co/150x50/0a0a0a/667eea?text=APP+LOGO" alt="logo" class="logo-img">
+        <div class="navbar-logo-container">
+            <img src="https://placehold.co/40x40/0a0a0a/667eea?text=APP" alt="logo" class="logo-img">
+            <span id="navbar-username-display" class="navbar-username">User</span>
+        </div>
+        <div class="nav-links">
+            <a href="#" id="home-nav-link" class="nav-link">Home</a>
+            <a href="#" id="services-nav-link" class="nav-link">Services</a>
+            <a href="https://www.linkedin.com/in/vrmanideep" target="_blank" class="nav-link">About Us</a>
+            <a href="#" id="feedback-nav-link" class="nav-link">Feedback</a>
         </div>
         <div class="user-menu-container">
             <button id="user-avatar-button" class="user-avatar-button">
                 <img id="user-avatar" src="https://placehold.co/40x40/764ba2/ffffff?text=U" alt="User Avatar">
-                <span id="user-display-name">User</span>
             </button>
             <div id="user-dropdown-menu" class="user-dropdown-menu">
                 <a href="#" id="profile-link" class="dropdown-item">Profile</a>
+                <a href="#" id="upload-profile-picture-link" class="dropdown-item">Upload Profile Picture</a>
+                <a href="#" id="change-password-link-dropdown" class="dropdown-item">Change Password</a>
                 <a href="#" id="logout-link" class="dropdown-item">Logout</a>
                 <a href="#" id="delete-account-link" class="dropdown-item danger">Delete Account</a>
             </div>
@@ -298,7 +615,7 @@
     <main class="main-content">
         <!-- The h1 content will be dynamically updated by JavaScript -->
         <h1 id="welcome-heading"></h1>
-        <p>This is the beginning of your new, redesigned home page. We'll add more features and content here as we go.</p>
+        <p>This is the beginning of your new, redesigned home page.</p>
     </main>
 
     <!-- Delete Account Confirmation Modal -->
@@ -314,19 +631,118 @@
         </div>
     </div>
 
+    <!-- Profile Picture Upload Modal -->
+    <div id="profile-upload-modal-overlay" class="modal-overlay">
+        <div class="profile-upload-modal-content">
+            <h3>Upload Profile Picture</h3>
+            <div class="preview-area">
+                <img id="profile-picture-preview" src="" alt="Image Preview" class="hidden">
+                <p id="preview-placeholder">No image selected</p>
+            </div>
+            <input type="file" id="profile-picture-input" accept="image/*">
+            <label for="profile-picture-input" class="custom-file-upload">Choose Image</label>
+            <div class="modal-buttons">
+                <button id="upload-picture-button" class="modal-button confirm">Upload</button>
+                <button id="cancel-upload-button" class="modal-button cancel">Cancel</button>
+            </div>
+            <p id="profile-upload-message" class="status-message"></p>
+        </div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div id="change-password-modal-overlay" class="modal-overlay">
+        <div class="change-password-modal-content">
+            <h3>Change Password</h3>
+            <div class="modal-form-group">
+                <label for="current-password">Current Password:</label>
+                <input type="password" id="current-password" placeholder="Enter current password">
+            </div>
+            <div class="modal-form-group">
+                <label for="new-password">New Password:</label>
+                <input type="password" id="new-password" placeholder="Enter new password">
+            </div>
+            <div class="modal-form-group">
+                <label for="confirm-new-password">Confirm New Password:</label>
+                <input type="password" id="confirm-new-password" placeholder="Confirm new password">
+            </div>
+            <div class="modal-buttons">
+                <button id="submit-change-password-button" class="modal-button confirm">Change Password</button>
+                <button id="cancel-change-password-button" class="modal-button cancel">Cancel</button>
+            </div>
+            <p id="change-password-message" class="status-message"></p>
+        </div>
+    </div>
+
+    <!-- Profile Details Modal -->
+    <div id="profile-details-modal-overlay" class="modal-overlay">
+        <div class="profile-details-modal-content">
+            <h3>Your Profile</h3>
+            <div class="profile-info-item">
+                <strong>Name:</strong> <span id="profile-name">Loading...</span>
+            </div>
+            <div class="profile-info-item">
+                <strong>Username:</strong> <span id="profile-username">Loading...</span>
+            </div>
+            <div class="profile-actions">
+                <button id="add-details-button" class="profile-action-button secondary">Add Details</button>
+                <button id="change-password-from-profile-button" class="profile-action-button">Change Password</button>
+                <button id="close-profile-details-button" class="modal-button cancel">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feedback Form Modal -->
+    <div id="feedback-modal-overlay" class="modal-overlay">
+        <div class="feedback-modal-content">
+            <h3>Send Us Feedback</h3>
+            <div class="modal-form-group">
+                <label for="feedback-message">Your Feedback:</label>
+                <textarea id="feedback-message" placeholder="Describe your experience and give suggestions" rows="6"></textarea>
+            </div>
+            <div class="modal-buttons">
+                <button id="submit-feedback-button" class="modal-button">Send Feedback</button>
+                <button id="cancel-feedback-button" class="modal-button cancel">Cancel</button>
+            </div>
+            <p id="feedback-status-message" class="status-message"></p>
+        </div>
+    </div>
+
+    <!-- Light/Dark Mode Toggle Button -->
+    <button id="theme-toggle" class="theme-toggle-button">
+        <!-- Sun icon for light mode, Moon icon for dark mode -->
+        <span id="theme-icon">☀️</span>
+    </button>
+
+    <!-- Footer for Social Media Links -->
+    <footer class="w-full py-4 text-center bg-transparent border-t border-transparent transition-colors duration-300">
+        <div class="social-links">
+            <a href="https://github.com/vrmanideep/New-folder--2-/" target="_blank" class="social-link">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.08-.731.084-.716.084-.716 1.192.085 1.815 1.229 1.815 1.229 1.064 1.814 2.809 1.299 3.494.994.108-.77.418-1.299.762-1.599-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.118-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.399.006 0 .012 0 .018 0 1.02.001 2.046.133 3.004.399 2.292-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.565 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+                </svg>
+            </a>
+            <a href="https://instagram.com/pvrmanideep/" target="_blank" class="social-link">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.204-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.254-.148-4.771-1.691-4.919-4.919-.058-1.265-.07-1.644-.07-4.849 0-3.204.012-3.584.07-4.849 0-3.252 1.691-4.771 4.919-4.919 1.265-.058 1.644-.07 4.849-.07zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.947.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.073 4.948.073 3.259 0 3.668-.014 4.947-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4s1.791-4 4-4 4 1.79 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                </svg>
+            </a>
+        </div>
+    </footer>
+
     <script type="module">
         // Import Firebase SDK modules
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-        import { getAuth, onAuthStateChanged, signOut, signInAnonymously, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getAuth, onAuthStateChanged, signOut, signInAnonymously, signInWithCustomToken, updateProfile } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
         const userAvatarButton = document.getElementById('user-avatar-button');
         const userAvatarImg = document.getElementById('user-avatar');
         const userDisplayNameSpan = document.getElementById('user-display-name');
+        const navbarUsernameDisplay = document.getElementById('navbar-username-display');
         const userDropdownMenu = document.getElementById('user-dropdown-menu');
         const logoutLink = document.getElementById('logout-link');
         const profileLink = document.getElementById('profile-link');
         const deleteAccountLink = document.getElementById('delete-account-link');
-        const welcomeHeading = document.getElementById('welcome-heading'); // Get the new h1 element
+        const welcomeHeading = document.getElementById('welcome-heading');
 
         // Delete account elements
         const deleteModalOverlay = document.getElementById('delete-modal-overlay');
@@ -334,208 +750,51 @@
         const cancelDeleteButton = document.getElementById('cancel-delete-button');
         const deleteModalMessage = document.getElementById('delete-modal-message');
 
+        // Profile Picture Upload elements
+        const uploadProfilePictureLink = document.getElementById('upload-profile-picture-link');
+        const profileUploadModalOverlay = document.getElementById('profile-upload-modal-overlay');
+        const profilePictureInput = document.getElementById('profile-picture-input');
+        const profilePicturePreview = document.getElementById('profile-picture-preview');
+        const previewPlaceholder = document.getElementById('preview-placeholder');
+        const uploadPictureButton = document.getElementById('upload-picture-button');
+        const cancelUploadButton = document.getElementById('cancel-upload-button');
+        const profileUploadMessage = document.getElementById('profile-upload-message');
+
+        // Change Password elements
+        const changePasswordLinkDropdown = document.getElementById('change-password-link-dropdown');
+        const changePasswordModalOverlay = document.getElementById('change-password-modal-overlay');
+        const currentPasswordInput = document.getElementById('current-password');
+        const newPasswordInput = document.getElementById('new-password');
+        const confirmNewPasswordInput = document.getElementById('confirm-new-password');
+        const submitChangePasswordButton = document.getElementById('submit-change-password-button');
+        const cancelChangePasswordButton = document.getElementById('cancel-change-password-button');
+        const changePasswordMessage = document.getElementById('change-password-message');
+
+        // Profile Details Modal elements
+        const profileDetailsModalOverlay = document.getElementById('profile-details-modal-overlay');
+        const profileNameSpan = document.getElementById('profile-name');
+        const profileUsernameSpan = document.getElementById('profile-username');
+        const addDetailsButton = document.getElementById('add-details-button');
+        const changePasswordFromProfileButton = document.getElementById('change-password-from-profile-button');
+        const closeProfileDetailsButton = document.getElementById('close-profile-details-button');
+
+        // Feedback Form elements
+        const feedbackNavLink = document.getElementById('feedback-nav-link');
+        const feedbackModalOverlay = document.getElementById('feedback-modal-overlay');
+        const feedbackMessageTextarea = document.getElementById('feedback-message');
+        const submitFeedbackButton = document.getElementById('submit-feedback-button');
+        const cancelFeedbackButton = document.getElementById('cancel-feedback-button');
+        const feedbackStatusMessage = document.getElementById('feedback-status-message');
+
+
+        // Theme Toggle elements
+        const themeToggleButton = document.getElementById('theme-toggle');
+        const themeIcon = document.getElementById('theme-icon');
+
+
         let firebaseApp;
         let firebaseAuth;
         let currentUser; // Stores the current authenticated Firebase user object
-
-        // Function to fetch client config from backend and initialize Firebase
-        async function fetchFirebaseClientConfigAndInit() {
-            try {
-                // Use the global __firebase_config variable if available, otherwise fetch from a mock API
-                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-                if (firebaseConfig) {
-                    firebaseApp = initializeApp(firebaseConfig);
-                    firebaseAuth = getAuth(firebaseApp);
-                    console.log("Firebase client app initialized in home.html using global config.");
-
-                    // Sign in with custom token if available, otherwise anonymously
-                    if (initialAuthToken) {
-                        await signInWithCustomToken(firebaseAuth, initialAuthToken);
-                        console.log("Signed in with custom token.");
-                    } else {
-                        await signInAnonymously(firebaseAuth);
-                        console.log("Signed in anonymously.");
-                    }
-
-                    // Set up auth state change listener
-                    onAuthStateChanged(firebaseAuth, (user) => {
-                        if (user) {
-                            currentUser = user;
-                            console.log("Home Page: User is logged in.", currentUser.uid);
-                            updateUserUI(currentUser);
-                            updateWelcomeMessage(currentUser); // Update welcome message on login
-                        } else {
-                            currentUser = null;
-                            console.log("Home Page: User is logged out. Redirecting.");
-                            // Redirect to login.html or handle logged-out state
-                            window.location.href = 'login.html';
-                        }
-                    });
-
-                } else {
-                    // Fallback for local development or if global config is not provided
-                    console.warn("Global __firebase_config not found. Attempting to fetch from mock API.");
-                    const response = await fetch('/api/firebase-config');
-                    const config = await response.json();
-                    if (config.success && config.config) {
-                        firebaseApp = initializeApp(config.config);
-                        firebaseAuth = getAuth(firebaseApp);
-                        console.log("Firebase client app initialized from mock API.");
-
-                        // Set up auth state change listener
-                        onAuthStateChanged(firebaseAuth, (user) => {
-                            if (user) {
-                                currentUser = user;
-                                console.log("Home Page: User is logged in.", currentUser.uid);
-                                updateUserUI(currentUser);
-                                updateWelcomeMessage(currentUser); // Update welcome message on login
-                            } else {
-                                currentUser = null;
-                                console.log("Home Page: User is logged out. Redirecting.");
-                                window.location.href = 'login.html'; // Redirect if not logged in
-                            }
-                        });
-                    } else {
-                        console.error("Failed to fetch Firebase client config:", config.message);
-                        // Using a custom message box instead of alert()
-                        showMessageBox("Error: Could not initialize Firebase. Please try again.", "error");
-                        window.location.href = 'login.html';
-                    }
-                }
-            } catch (error) {
-                console.error("Error during Firebase initialization:", error);
-                // Using a custom message box instead of alert()
-                showMessageBox("Network error: Could not initialize Firebase.", "error");
-                window.location.href = 'login.html';
-            }
-        }
-
-        // Function to update user UI (avatar, name)
-        function updateUserUI(user) {
-            if (user.photoURL) {
-                userAvatarImg.src = user.photoURL;
-            } else {
-                // Fallback to a generic avatar if no photoURL
-                userAvatarImg.src = 'https://placehold.co/40x40/764ba2/ffffff?text=U';
-            }
-            userDisplayNameSpan.textContent = user.displayName || user.email || 'User';
-        }
-
-        // Function to update the welcome message
-        function updateWelcomeMessage(user) {
-            const username = user.displayName || user.email || 'User';
-            welcomeHeading.textContent = `Hi, ${username}!`;
-        }
-
-        // --- Dropdown Toggle ---
-        userAvatarButton.addEventListener('click', (event) => {
-            event.stopPropagation(); // Prevent click from immediately closing dropdown
-            userDropdownMenu.classList.toggle('show');
-        });
-
-        // Close dropdown if clicked outside
-        document.addEventListener('click', (event) => {
-            if (!userDropdownMenu.contains(event.target) && !userAvatarButton.contains(event.target)) {
-                userDropdownMenu.classList.remove('show');
-            }
-        });
-
-        // --- Logout Functionality ---
-        logoutLink.addEventListener('click', async (event) => {
-            event.preventDefault(); // Prevent default link behavior
-            if (firebaseAuth) {
-                try {
-                    await signOut(firebaseAuth); // Sign out from Firebase Auth
-                    // onAuthStateChanged listener will handle redirection
-                } catch (error) {
-                    console.error("Error signing out:", error);
-                    showMessageBox("Error logging out. Please try again.", "error");
-                }
-            }
-        });
-
-        // --- Profile Link (Placeholder for now) ---
-        profileLink.addEventListener('click', (event) => {
-            event.preventDefault();
-            showMessageBox("Profile page coming soon!", "info"); // Placeholder for actual profile page
-            userDropdownMenu.classList.remove('show'); // Close dropdown
-        });
-
-        // --- Delete Account Functions ---
-        function showDeleteModal() {
-            deleteModalOverlay.classList.add('show');
-            deleteModalMessage.textContent = ''; // Clear previous messages
-            deleteModalMessage.className = 'status-message';
-            userDropdownMenu.classList.remove('show'); // Close main dropdown
-        }
-
-        function hideDeleteModal() {
-            deleteModalOverlay.classList.remove('show');
-        }
-
-        async function deleteUserAccount() {
-            if (!currentUser) {
-                deleteModalMessage.textContent = "Error: User not authenticated. Cannot delete account.";
-                deleteModalMessage.classList.add('error');
-                return;
-            }
-
-            deleteModalMessage.textContent = "Deleting account...";
-            deleteModalMessage.classList.add('info');
-            confirmDeleteButton.disabled = true;
-            cancelDeleteButton.disabled = true;
-
-            try {
-                const idToken = await currentUser.getIdToken();
-                // For security, we pass the current user's email/username for the backend to verify
-                // against the token's UID before deletion.
-                const identifierToDelete = currentUser.email || userDisplayNameSpan.textContent; // Use email or displayed name
-
-                const response = await fetch('/api/delete-user', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${idToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ identifier: identifierToDelete }),
-                });
-
-                const result = await response.json();
-
-                if (response.ok && result.success) {
-                    deleteModalMessage.textContent = result.message + " Redirecting to login...";
-                    deleteModalMessage.classList.add('success');
-                    // Force sign out from Firebase Auth after successful backend deletion
-                    await signOut(firebaseAuth);
-                    // onAuthStateChanged listener will handle redirection to login.html
-                } else if (response.status === 401) {
-                    deleteModalMessage.textContent = "Session expired. Please log in again.";
-                    deleteModalMessage.classList.add('error');
-                    await signOut(firebaseAuth);
-                }
-                else {
-                    deleteModalMessage.textContent = result.message || 'Failed to delete account.';
-                    deleteModalMessage.classList.add('error');
-                }
-            } catch (error) {
-                console.error('Network error deleting account:', error);
-                deleteModalMessage.textContent = 'Network error deleting account. Please try again.';
-                deleteModalMessage.classList.add('error');
-            } finally {
-                confirmDeleteButton.disabled = false;
-                cancelDeleteButton.disabled = false;
-            }
-        }
-
-        // Event Listeners for Delete Modal
-        deleteAccountLink.addEventListener('click', (event) => {
-            event.preventDefault(); // Prevent default link behavior
-            showDeleteModal();
-        });
-        cancelDeleteButton.addEventListener('click', hideDeleteModal);
-        confirmDeleteButton.addEventListener('click', deleteUserAccount);
 
         // Custom message box function (replaces alert)
         function showMessageBox(message, type = 'info') {
@@ -560,8 +819,634 @@
             }, 3000); // Message disappears after 3 seconds
         }
 
-        // Initiate Firebase config fetch and initialization on page load
-        document.addEventListener('DOMContentLoaded', fetchFirebaseClientConfigAndInit);
+        // Function to fetch client config from backend and initialize Firebase
+        async function fetchFirebaseClientConfigAndInit() {
+            console.log("fetchFirebaseClientConfigAndInit called.");
+            try {
+                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+                console.log("Firebase Config (from global or null):", firebaseConfig);
+                console.log("Initial Auth Token (from global or null):", initialAuthToken ? "Present" : "Not Present");
+
+
+                if (firebaseConfig) {
+                    firebaseApp = initializeApp(firebaseConfig);
+                    firebaseAuth = getAuth(firebaseApp);
+                    console.log("Firebase client app initialized in home.html using global config.");
+
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(firebaseAuth, initialAuthToken);
+                        console.log("Signed in with custom token.");
+                    } else {
+                        await signInAnonymously(firebaseAuth);
+                        console.log("Signed in anonymously.");
+                    }
+
+                    onAuthStateChanged(firebaseAuth, (user) => {
+                        console.log("Auth state changed, user:", user);
+                        if (user) {
+                            currentUser = user;
+                            console.log("Home Page: User is logged in.", currentUser.uid);
+                            updateUserUI(currentUser);
+                            updateWelcomeMessage(currentUser);
+                        } else {
+                            currentUser = null;
+                            console.log("Home Page: User is logged out. Redirecting.");
+                            window.location.href = 'login.html';
+                        }
+                    });
+
+                } else {
+                    console.warn("Global __firebase_config not found. Attempting to fetch from mock API.");
+                    const response = await fetch('/api/firebase-config');
+                    const config = await response.json();
+                    if (config.success && config.config) {
+                        firebaseApp = initializeApp(config.config);
+                        firebaseAuth = getAuth(firebaseApp);
+                        console.log("Firebase client app initialized from mock API.");
+
+                        onAuthStateChanged(firebaseAuth, (user) => {
+                            console.log("Auth state changed (from mock API), user:", user);
+                            if (user) {
+                                currentUser = user;
+                                console.log("Home Page: User is logged in.", currentUser.uid);
+                                updateUserUI(currentUser);
+                                updateWelcomeMessage(currentUser);
+                            } else {
+                                currentUser = null;
+                                console.log("Home Page: User is logged out. Redirecting.");
+                                window.location.href = 'login.html';
+                            }
+                        });
+                    } else {
+                        console.error("Failed to fetch Firebase client config:", config.message);
+                        showMessageBox("Error: Could not initialize Firebase. Please try again.", "error");
+                        window.location.href = 'login.html';
+                    }
+                }
+            } catch (error) {
+                console.error("Error during Firebase initialization:", error);
+                showMessageBox("Network error: Could not initialize Firebase.", "error");
+                window.location.href = 'login.html';
+            }
+        }
+
+        async function updateUserUI(user) {
+            console.log("Updating UI for user:", user);
+            console.log("User Photo URL:", user.photoURL, "Display Name:", user.displayName, "Email:", user.email);
+            
+            // Update user avatar image
+            if (user.photoURL && user.photoURL.startsWith('http')) {
+                userAvatarImg.src = user.photoURL;
+            } else if (user.photoURL && user.photoURL.startsWith('/uploads/')) {
+                // For locally stored images, ensure the full URL is used if not already
+                // This assumes the app is served from the root, adjust if nested
+                userAvatarImg.src = window.location.origin + user.photoURL;
+            }
+            else {
+                userAvatarImg.src = 'https://placehold.co/40x40/764ba2/ffffff?text=U';
+            }
+
+            // Fetch username from backend for navbar display
+            try {
+                const idToken = await user.getIdToken();
+                const response = await fetch('/api/user-profile', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${idToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                const result = await response.json();
+                if (response.ok && result.success && result.profile) {
+                    const username = result.profile.username || 'User';
+                    navbarUsernameDisplay.textContent = username; // Update navbar username
+                    userDisplayNameSpan.textContent = user.displayName || username; // Update dropdown display name
+                } else {
+                    console.warn("Failed to fetch user profile for navbar username:", result.message);
+                    navbarUsernameDisplay.textContent = user.displayName || user.email || 'User';
+                    userDisplayNameSpan.textContent = user.displayName || user.email || 'User';
+                }
+            } catch (error) {
+                console.error("Error fetching user profile for navbar:", error);
+                navbarUsernameDisplay.textContent = user.displayName || user.email || 'User';
+                userDisplayNameSpan.textContent = user.displayName || user.email || 'User';
+            }
+        }
+
+        function updateWelcomeMessage(user) {
+            const username = user.displayName || user.email || 'User';
+            console.log("Updating welcome message for username:", username);
+            welcomeHeading.textContent = `Hi, ${username}!`;
+        }
+
+        // --- Dropdown Toggle ---
+        userAvatarButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            userDropdownMenu.classList.toggle('show');
+        });
+
+        document.addEventListener('click', (event) => {
+            if (!userDropdownMenu.contains(event.target) && !userAvatarButton.contains(event.target)) {
+                userDropdownMenu.classList.remove('show');
+            }
+        });
+
+        // --- Navigation Links Handlers ---
+        document.getElementById('home-nav-link').addEventListener('click', (event) => {
+            event.preventDefault();
+            showMessageBox('Home page functionality coming soon!', 'info');
+        });
+
+        document.getElementById('services-nav-link').addEventListener('click', (event) => {
+            event.preventDefault();
+            showMessageBox('Services page coming soon!', 'info');
+        });
+
+        // About Us link now directly navigates due to href attribute
+        // No need for a separate JS event listener here as it's a direct link
+
+        feedbackNavLink.addEventListener('click', (event) => {
+            event.preventDefault();
+            showFeedbackModal();
+        });
+
+
+        // --- Logout Functionality ---
+        logoutLink.addEventListener('click', async (event) => {
+            event.preventDefault();
+            if (firebaseAuth) {
+                try {
+                    await signOut(firebaseAuth);
+                } catch (error) {
+                    console.error("Error signing out:", error);
+                    showMessageBox("Error logging out. Please try again.", "error");
+                }
+            }
+        });
+
+        // --- Profile Link (Opens Profile Details Modal) ---
+        profileLink.addEventListener('click', async (event) => {
+            event.preventDefault();
+            userDropdownMenu.classList.remove('show'); // Close main dropdown
+            showProfileDetailsModal();
+            await fetchUserProfileDataToModal(); // Fetch and display user data in the modal
+        });
+
+        // --- Delete Account Functions ---
+        function showDeleteModal() {
+            deleteModalOverlay.classList.add('show');
+            deleteModalMessage.textContent = '';
+            deleteModalMessage.className = 'status-message';
+            userDropdownMenu.classList.remove('show');
+        }
+
+        function hideDeleteModal() {
+            deleteModalOverlay.classList.remove('show');
+        }
+
+        async function deleteUserAccount() {
+            if (!currentUser) {
+                deleteModalMessage.textContent = "Error: User not authenticated. Cannot delete account.";
+                deleteModalMessage.classList.add('error');
+                return;
+            }
+
+            deleteModalMessage.textContent = "Deleting account...";
+            deleteModalMessage.classList.add('info');
+            confirmDeleteButton.disabled = true;
+            cancelDeleteButton.disabled = true;
+
+            try {
+                const idToken = await currentUser.getIdToken();
+                const identifierToDelete = currentUser.email || userDisplayNameSpan.textContent;
+
+                const response = await fetch('/api/delete-user', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${idToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ identifier: identifierToDelete }),
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    deleteModalMessage.textContent = result.message + " Redirecting to login...";
+                    deleteModalMessage.classList.add('success');
+                    await signOut(firebaseAuth);
+                } else if (response.status === 401) {
+                    deleteModalMessage.textContent = "Session expired. Please log in again.";
+                    deleteModalMessage.classList.add('error');
+                    await signOut(firebaseAuth);
+                }
+                else {
+                    deleteModalMessage.textContent = result.message || 'Failed to delete account.';
+                    deleteModalMessage.classList.add('error');
+                }
+            } catch (error) {
+                console.error('Network error deleting account:', error);
+                deleteModalMessage.textContent = 'Network error deleting account. Please try again.';
+                deleteModalMessage.classList.add('error');
+            } finally {
+                confirmDeleteButton.disabled = false;
+                cancelDeleteButton.disabled = false;
+            }
+        }
+
+        deleteAccountLink.addEventListener('click', (event) => {
+            event.preventDefault();
+            showDeleteModal();
+        });
+        cancelDeleteButton.addEventListener('click', hideDeleteModal);
+        confirmDeleteButton.addEventListener('click', deleteUserAccount);
+
+        // --- Profile Picture Upload Functionality ---
+        uploadProfilePictureLink.addEventListener('click', (event) => {
+            event.preventDefault();
+            profileUploadModalOverlay.classList.add('show');
+            profileUploadMessage.textContent = '';
+            profileUploadMessage.className = 'status-message';
+            profilePicturePreview.classList.add('hidden');
+            profilePicturePreview.src = '';
+            previewPlaceholder.classList.remove('hidden');
+            profilePictureInput.value = '';
+            userDropdownMenu.classList.remove('show');
+        });
+
+        cancelUploadButton.addEventListener('click', () => {
+            profileUploadModalOverlay.classList.remove('show');
+        });
+
+        profilePictureInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    profilePicturePreview.src = e.target.result;
+                    profilePicturePreview.classList.remove('hidden');
+                    previewPlaceholder.classList.add('hidden');
+                };
+                reader.readAsDataURL(file);
+            } else {
+                profilePicturePreview.classList.add('hidden');
+                profilePicturePreview.src = '';
+                previewPlaceholder.classList.remove('hidden');
+            }
+        });
+
+        uploadPictureButton.addEventListener('click', async () => {
+            const file = profilePictureInput.files[0];
+            if (!file) {
+                profileUploadMessage.textContent = 'Please select an image to upload.';
+                profileUploadMessage.classList.add('error');
+                return;
+            }
+
+            if (!currentUser) {
+                profileUploadMessage.textContent = "Error: User not authenticated. Cannot upload picture.";
+                profileUploadMessage.classList.add('error');
+                return;
+            }
+
+            profileUploadMessage.textContent = 'Uploading...';
+            profileUploadMessage.classList.add('info');
+            uploadPictureButton.disabled = true;
+            cancelUploadButton.disabled = true;
+
+            try {
+                const idToken = await currentUser.getIdToken();
+
+                const response = await fetch('/api/upload-profile-picture', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${idToken}`,
+                    },
+                    body: formData,
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success && result.photoURL) {
+                    profileUploadMessage.textContent = result.message;
+                    profileUploadMessage.classList.add('success');
+
+                    await updateProfile(currentUser, {
+                        photoURL: result.photoURL
+                    });
+
+                    updateUserUI(currentUser); // Refresh UI with new photoURL
+
+                    showMessageBox('Profile picture updated successfully!', 'success');
+                    setTimeout(() => {
+                        hideProfileUploadModal();
+                    }, 1500);
+                } else if (response.status === 401) {
+                    profileUploadMessage.textContent = "Session expired. Please log in again.";
+                    profileUploadMessage.classList.add('error');
+                    await signOut(firebaseAuth);
+                } else {
+                    profileUploadMessage.textContent = result.message || 'Failed to upload profile picture.';
+                    profileUploadMessage.classList.add('error');
+                }
+            } catch (error) {
+                console.error('Error uploading profile picture:', error);
+                profileUploadMessage.textContent = 'Network error during upload. Please try again.';
+                profileUploadMessage.classList.add('error');
+            } finally {
+                uploadPictureButton.disabled = false;
+                cancelUploadButton.disabled = false;
+            }
+        });
+
+        function hideProfileUploadModal() {
+            profileUploadModalOverlay.classList.remove('show');
+        }
+
+        // --- Change Password Functions ---
+        changePasswordLinkDropdown.addEventListener('click', (event) => {
+            event.preventDefault();
+            userDropdownMenu.classList.remove('show'); // Close main dropdown
+            showChangePasswordModal();
+        });
+
+        cancelChangePasswordButton.addEventListener('click', () => {
+            hideChangePasswordModal();
+        });
+
+        submitChangePasswordButton.addEventListener('click', async () => {
+            const currentPassword = currentPasswordInput.value;
+            const newPassword = newPasswordInput.value;
+            const confirmNewPassword = confirmNewPasswordInput.value;
+
+            changePasswordMessage.textContent = ''; // Clear previous messages
+            changePasswordMessage.className = 'status-message';
+
+            if (!currentPassword || !newPassword || !confirmNewPassword) {
+                changePasswordMessage.textContent = 'All fields are required.';
+                changePasswordMessage.classList.add('error');
+                return;
+            }
+
+            if (newPassword !== confirmNewPassword) {
+                changePasswordMessage.textContent = 'New password and confirmation do not match.';
+                changePasswordMessage.classList.add('error');
+                return;
+            }
+
+            if (newPassword.length < 6) {
+                changePasswordMessage.textContent = 'New password must be at least 6 characters long.';
+                changePasswordMessage.classList.add('error');
+                return;
+            }
+            
+            changePasswordMessage.textContent = 'Changing password...';
+            changePasswordMessage.classList.add('info');
+            submitChangePasswordButton.disabled = true;
+            cancelChangePasswordButton.disabled = true;
+
+            try {
+                const idToken = await currentUser.getIdToken();
+
+                const response = await fetch('/api/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${idToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        currentPassword: currentPassword,
+                        newPassword: newPassword
+                    }),
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    changePasswordMessage.textContent = result.message;
+                    changePasswordMessage.classList.add('success');
+                    showMessageBox('Password changed successfully!', 'success');
+                    
+                    // After successful password change, Firebase invalidates the token.
+                    // The client needs to re-authenticate. Redirect to login.
+                    setTimeout(async () => {
+                        hideChangePasswordModal();
+                        await signOut(firebaseAuth); // Explicitly sign out to trigger onAuthStateChanged
+                        window.location.href = 'login.html'; // Ensure redirection
+                    }, 1500);
+
+                } else if (response.status === 401) {
+                    changePasswordMessage.textContent = "Session expired. Please log in again.";
+                    changePasswordMessage.classList.add('error');
+                    await signOut(firebaseAuth);
+                } else {
+                    changePasswordMessage.textContent = result.message || 'Failed to change password.';
+                    changePasswordMessage.classList.add('error');
+                }
+            } catch (error) {
+                console.error('Network error changing password:', error);
+                changePasswordMessage.textContent = 'Network error changing password. Please try again.';
+                changePasswordMessage.classList.add('error');
+            } finally {
+                submitChangePasswordButton.disabled = false;
+                cancelChangePasswordButton.disabled = false;
+            }
+        });
+
+        function showChangePasswordModal() {
+            changePasswordModalOverlay.classList.add('show');
+            changePasswordMessage.textContent = '';
+            changePasswordMessage.className = 'status-message';
+            currentPasswordInput.value = '';
+            newPasswordInput.value = '';
+            confirmNewPasswordInput.value = '';
+        }
+
+        function hideChangePasswordModal() {
+            changePasswordModalOverlay.classList.remove('show');
+        }
+
+        // --- Profile Details Modal Functions ---
+        async function showProfileDetailsModal() {
+            profileDetailsModalOverlay.classList.add('show');
+            // Reset content while loading
+            profileNameSpan.textContent = 'Loading...';
+            profileUsernameSpan.textContent = 'Loading...';
+        }
+
+        function hideProfileDetailsModal() {
+            profileDetailsModalOverlay.classList.remove('show');
+        }
+
+        async function fetchUserProfileDataToModal() {
+            if (!currentUser) {
+                profileNameSpan.textContent = 'N/A';
+                profileUsernameSpan.textContent = 'N/A';
+                showMessageBox("Error: User not authenticated. Cannot fetch profile.", "error");
+                return;
+            }
+
+            try {
+                const idToken = await currentUser.getIdToken();
+                const response = await fetch('/api/user-profile', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${idToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success && result.profile) {
+                    profileNameSpan.textContent = result.profile.name || 'N/A';
+                    profileUsernameSpan.textContent = result.profile.username || 'N/A';
+                } else if (response.status === 401) {
+                    showMessageBox("Session expired. Please log in again.", "error");
+                    await signOut(firebaseAuth);
+                } else {
+                    profileNameSpan.textContent = 'Error';
+                    profileUsernameSpan.textContent = 'Error';
+                    showMessageBox(result.message || 'Failed to fetch profile data.', 'error');
+                }
+            } catch (error) {
+                console.error('Network error fetching profile:', error);
+                profileNameSpan.textContent = 'Network Error';
+                profileUsernameSpan.textContent = 'Network Error';
+                showMessageBox('Network error fetching profile data. Please try again.', 'error');
+            }
+        }
+
+        // Event listeners for Profile Details Modal
+        closeProfileDetailsButton.addEventListener('click', hideProfileDetailsModal);
+
+        addDetailsButton.addEventListener('click', () => {
+            showMessageBox("Add details feature coming soon!", "info");
+        });
+
+        changePasswordFromProfileButton.addEventListener('click', () => {
+            hideProfileDetailsModal(); // Close profile details modal first
+            showChangePasswordModal(); // Then open change password modal
+        });
+
+        // --- Feedback Form Functions ---
+        function showFeedbackModal() {
+            feedbackModalOverlay.classList.add('show');
+            feedbackMessageTextarea.value = ''; // Clear previous message
+            feedbackStatusMessage.textContent = ''; // Clear status message
+            feedbackStatusMessage.className = 'status-message';
+        }
+
+        function hideFeedbackModal() {
+            feedbackModalOverlay.classList.remove('show');
+        }
+
+        submitFeedbackButton.addEventListener('click', async () => {
+            const feedbackMessage = feedbackMessageTextarea.value.trim();
+            feedbackStatusMessage.textContent = '';
+            feedbackStatusMessage.className = 'status-message';
+
+            if (!feedbackMessage) {
+                feedbackStatusMessage.textContent = 'Feedback message cannot be empty.';
+                feedbackStatusMessage.classList.add('error');
+                return;
+            }
+
+            feedbackStatusMessage.textContent = 'Sending feedback...';
+            feedbackStatusMessage.classList.add('info');
+            submitFeedbackButton.disabled = true;
+            cancelFeedbackButton.disabled = true;
+
+            try {
+                const idToken = await currentUser.getIdToken(); // Get ID token for authentication
+
+                const response = await fetch('/api/send-feedback', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${idToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: feedbackMessage }),
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    feedbackStatusMessage.textContent = 'Feedback sent successfully!';
+                    feedbackStatusMessage.classList.add('success');
+                    showMessageBox('Thank you!', 'success');
+                    setTimeout(() => {
+                        hideFeedbackModal();
+                    }, 1500);
+                } else if (response.status === 401) {
+                    feedbackStatusMessage.textContent = "Session expired. Please log in again.";
+                    feedbackStatusMessage.classList.add('error');
+                    await signOut(firebaseAuth);
+                } else {
+                    feedbackStatusMessage.textContent = result.message || 'Failed to send feedback.';
+                    feedbackStatusMessage.classList.add('error');
+                }
+            } catch (error) {
+                console.error('Network error sending feedback:', error);
+                feedbackStatusMessage.textContent = 'Network error sending feedback. Please try again.';
+                feedbackStatusMessage.classList.add('error');
+            } finally {
+                submitFeedbackButton.disabled = false;
+                cancelFeedbackButton.disabled = false;
+            }
+        });
+
+        cancelFeedbackButton.addEventListener('click', hideFeedbackModal);
+
+
+        // --- Light/Dark Mode Toggle Logic ---
+        function applyTheme(theme) {
+            console.log("Applying theme:", theme);
+            if (theme === 'dark') {
+                document.body.classList.remove('light-mode');
+                themeIcon.textContent = '🌙'; // Moon icon for dark mode
+                localStorage.setItem('theme', 'dark');
+            } else {
+                document.body.classList.add('light-mode');
+                themeIcon.textContent = '☀️'; // Sun icon for light mode
+                localStorage.setItem('theme', 'light');
+            }
+            console.log("Body class list after applyTheme:", document.body.classList);
+        }
+
+        function toggleTheme() {
+            const currentTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            console.log("Toggling theme. Current theme:", currentTheme);
+            if (currentTheme === 'dark') {
+                applyTheme('light');
+            } else {
+                applyTheme('dark');
+            }
+        }
+
+        // Event listener for the theme toggle button
+        themeToggleButton.addEventListener('click', toggleTheme);
+
+        // Apply theme on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("DOMContentLoaded fired.");
+            fetchFirebaseClientConfigAndInit(); // Initialize Firebase first
+            const savedTheme = localStorage.getItem('theme');
+            console.log("Saved theme from localStorage:", savedTheme);
+            console.log("System prefers dark color scheme:", window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+            if (savedTheme) {
+                applyTheme(savedTheme);
+            } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                // Default to dark if system preference is dark and no saved theme
+                applyTheme('dark');
+            } else {
+                // Default to light if no saved theme and system preference is not dark
+                applyTheme('light');
+            }
+        });
 
     </script>
 </body>
