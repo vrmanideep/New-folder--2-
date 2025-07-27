@@ -6,6 +6,8 @@
     <title>Login Page</title>
     <!-- Tailwind CSS CDN for easy styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         /* Custom styles to make it look different */
         body {
@@ -29,8 +31,8 @@
             max-width: 400px; /* Max width for better control on larger screens */
             text-align: center;
             border: 1px solid rgba(255, 255, 255, 0.3); /* Subtle border */
-            backdrop-filter: blur(5px); /* Frosted glass effect */
-            -webkit-backdrop-filter: blur(5px); /* For Safari */
+            -webkit-backdrop-filter: blur(5px); /* Frosted glass effect */
+            backdrop-filter: blur(5px); /* For Safari */
         }
 
         .login-container h2 {
@@ -80,7 +82,7 @@
             font-weight: 700;
             cursor: pointer;
             transition: background 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
-            box-shadow: 0 5px 15px rgba(118, 75, 162, 0.4); /* Button shadow */
+            box-shadow: 0 5px 15px rgba(118, 75, 162, 0.4);
         }
 
         .login-button:hover {
@@ -91,6 +93,13 @@
         .login-button:active {
             transform: translateY(0); /* Press down effect */
             box-shadow: 0 2px 5px rgba(118, 75, 162, 0.2);
+        }
+
+        .login-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
         }
 
         .register-link {
@@ -119,53 +128,6 @@
         .message.error { color: #dc3545; }
         .message.info { color: #007bff; }
 
-        /* New styles for Gemini API feature */
-        .gemini-button {
-            width: 100%;
-            padding: 0.8rem;
-            margin-top: 1rem;
-            background: linear-gradient(90deg, #242c9d 0%, #0d0d15 100%); /* Green gradient */
-            color: white;
-            border: none;
-            border-radius: 0.75rem;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
-            box-shadow: 0 5px 15px rgba(38, 60, 99, 0.4);
-        }
-        .gemini-button:hover {
-            background: linear-gradient(90deg, #2e2e9b 0%, #312448 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(46, 35, 90, 0.5);
-        }
-        .gemini-button:active {
-            transform: translateY(0);
-            box-shadow: 0 2px 5px rgba(76, 175, 80, 0.2);
-        }
-        .gemini-response {
-            margin-top: 1.5rem;
-            padding: 1rem;
-            background-color: #f8f8f8;
-            border-radius: 0.75rem;
-            text-align: left;
-            color: #333;
-            font-size: 0.9rem;
-            line-height: 1.5;
-            border: 1px solid #eee;
-            box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
-            max-height: 200px; /* Limit height */
-            overflow-y: auto; /* Add scroll if content overflows */
-        }
-        .gemini-response.hidden {
-            display: none;
-        }
-        .gemini-response.loading {
-            text-align: center;
-            font-style: italic;
-            color: #777;
-        }
-
         /* Google Sign-In Button Style */
         .google-signin-button {
             display: flex;
@@ -193,6 +155,12 @@
             transform: translateY(0);
             box-shadow: 0 2px 5px rgba(66, 133, 244, 0.2);
         }
+        .google-signin-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
         .google-signin-button img {
             margin-right: 0.75rem;
             height: 1.2rem;
@@ -201,7 +169,7 @@
 
         /* Responsive adjustments for new features */
         @media (max-width: 480px) {
-            .gemini-button, .google-signin-button {
+            .google-signin-button {
                 padding: 0.7rem;
                 font-size: 0.9rem;
             }
@@ -209,10 +177,6 @@
                 height: 1rem;
                 width: 1rem;
                 margin-right: 0.5rem;
-            }
-            .gemini-response {
-                padding: 0.8rem;
-                font-size: 0.85rem;
             }
         }
     </style>
@@ -239,24 +203,41 @@
         </button>
 
         <p class="register-link">
-            Don't have an account? <a href="register.html">Register</a>
+            Don't have an account? <a href="register.html">Register here</a>
         </p>
-
-        <!-- Gemini API Feature -->
-        <button id="gemini-help-button" class="gemini-button">✨ Get Login Help ✨</button>
-        <div id="gemini-response" class="gemini-response hidden"></div>
-
-        <h4>Coming soon</h4>
     </div>
 
     <script type="module">
         // Import Firebase SDK modules
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-        import { getAuth, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getAuth, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
         // Placeholder for Firebase client configuration (will be fetched from backend)
         let firebaseClientConfig = {};
         let firebaseAuthInstance; // Store the auth instance
+
+        // Custom message box function (replaces alert)
+        function showMessageBox(message, type = 'info') {
+            const messageBox = document.createElement('div');
+            messageBox.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white z-[3000]`;
+            
+            let bgColor = '';
+            if (type === 'success') {
+                bgColor = 'bg-green-500';
+            } else if (type === 'error') {
+                bgColor = 'bg-red-500';
+            } else {
+                bgColor = 'bg-blue-500';
+            }
+            messageBox.classList.add(bgColor);
+            
+            messageBox.textContent = message;
+            document.body.appendChild(messageBox);
+
+            setTimeout(() => {
+                messageBox.remove();
+            }, 3000); // Message disappears after 3 seconds
+        }
 
         // Function to fetch client config from backend
         async function fetchFirebaseClientConfig() {
@@ -274,8 +255,14 @@
                     onAuthStateChanged(firebaseAuthInstance, (user) => {
                         if (user) {
                             console.log("Firebase Auth State Changed: User is logged in.", user.uid);
-                            // No need to store userId in localStorage here, Firebase SDK manages it.
-                            // The home.html will check Firebase Auth state directly.
+                            // If user is logged in and email is verified, redirect to home.html
+                            if (user.emailVerified) {
+                                window.location.href = 'home.html';
+                            } else {
+                                // If user is logged in but email not verified, redirect to email verification page
+                                showMessageBox('Please verify your email to continue.', 'warning');
+                                window.location.href = `email_verification.html?email=${encodeURIComponent(user.email)}`;
+                            }
                         } else {
                             console.log("Firebase Auth State Changed: User is logged out.");
                             // If user is on a protected page and logs out, redirect to login
@@ -287,13 +274,11 @@
 
                 } else {
                     console.error("Failed to fetch Firebase client config:", config.message);
-                    loginMessage.textContent = "Error: Could not initialize Firebase. Please try again.";
-                    loginMessage.classList.add('error');
+                    showMessageBox("Error: Could not initialize Firebase. Please try again.", "error");
                 }
             } catch (error) {
                 console.error("Network error fetching Firebase client config:", error);
-                loginMessage.textContent = "Network error: Could not initialize Firebase.";
-                loginMessage.classList.add('error');
+                showMessageBox("Network error: Could not initialize Firebase.", "error");
             }
         }
 
@@ -304,12 +289,11 @@
         const loginForm = document.getElementById('login-form');
         const identifierInput = document.getElementById('identifier');
         const passwordInput = document.getElementById('password');
+        const loginButton = loginForm.querySelector('.login-button'); // Get button for disabling
         const loginMessage = document.getElementById('login-message');
-        const geminiHelpButton = document.getElementById('gemini-help-button');
-        const geminiResponseDiv = document.getElementById('gemini-response');
-        const googleSignInButton = document.getElementById('google-signin-button'); // New button reference
+        const googleSignInButton = document.getElementById('google-signin-button');
 
-        // --- Email/Password Login ---
+        // --- Email/Username/Password Login ---
         loginForm.addEventListener('submit', async (event) => {
             event.preventDefault(); // Prevent default form submission
 
@@ -318,48 +302,90 @@
 
             loginMessage.textContent = ''; // Clear previous messages
             loginMessage.className = 'message'; // Reset classes
+            showMessageBox('', 'info'); // Clear previous pop-up message
 
             if (!identifier || !password) {
                 loginMessage.textContent = 'Please enter both username/email and password.';
                 loginMessage.classList.add('error');
+                showMessageBox('Please enter both username/email and password.', 'error');
                 return;
             }
 
             loginMessage.textContent = 'Logging in...';
             loginMessage.classList.add('info');
+            loginButton.disabled = true; // Disable login button
+            googleSignInButton.disabled = true; // Disable Google button
 
             try {
-                // 1. Call your Flask backend to get a custom token
-                const response = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ identifier, password }),
-                });
+                // Check if the identifier is likely an email (contains '@')
+                if (identifier.includes('@')) {
+                    // Attempt to sign in with email and password directly using Firebase Client SDK
+                    const userCredential = await signInWithEmailAndPassword(firebaseAuthInstance, identifier, password);
+                    const user = userCredential.user;
 
-                const result = await response.json();
-
-                if (response.ok && result.success && result.customToken) {
-                    // 2. Use Firebase JS SDK to sign in with the custom token
-                    await signInWithCustomToken(firebaseAuthInstance, result.customToken);
-
-                    loginMessage.textContent = result.message;
+                    console.log("Firebase Email/Password Sign-In successful on client:", user.uid);
+                    loginMessage.textContent = 'Login successful!';
                     loginMessage.classList.add('success');
-                    window.location.href = 'home.html'; // Redirect after successful Firebase Auth sign-in
+                    showMessageBox('Login successful!', 'success');
+                    // The onAuthStateChanged listener will handle redirection based on email verification status
 
                 } else {
-                    loginMessage.textContent = result.message || 'Login failed. Please try again.';
-                    loginMessage.classList.add('error');
+                    // If it's not an email, assume it's a username and send to backend for resolution
+                    console.log("Attempting login with username:", identifier);
+                    const response = await fetch('/api/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ identifier, password }),
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok && result.success && result.token) {
+                        // Use Firebase JS SDK to sign in with the custom token received from backend
+                        if (firebaseAuthInstance) {
+                            await signInWithCustomToken(firebaseAuthInstance, result.token);
+                            console.log("Signed in with custom token after username login.");
+                            loginMessage.textContent = result.message;
+                            loginMessage.classList.add('success');
+                            showMessageBox(result.message, 'success');
+                            // The onAuthStateChanged listener will handle redirection based on email verification status
+                        } else {
+                            loginMessage.textContent = 'Firebase not initialized. Please try again.';
+                            loginMessage.classList.add('error');
+                            showMessageBox('Firebase not initialized. Please try again.', 'error');
+                        }
+                    } else {
+                        loginMessage.textContent = result.message || 'Login failed. Please try again.';
+                        loginMessage.classList.add('error');
+                        showMessageBox(result.message || 'Login failed. Please try again.', 'error');
+                    }
                 }
+
             } catch (error) {
-                console.error('Login process error:', error);
-                if (error.code) {
-                    loginMessage.textContent = `Firebase Auth Error: ${error.message}`;
-                } else {
-                    loginMessage.textContent = 'Network error during login. Please try again later.';
+                console.error('Login error:', error);
+                let displayMessage = 'Login failed. Please check your credentials.';
+                if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+                    displayMessage = 'Invalid username/email or password.';
+                } else if (error.code === 'auth/invalid-email') {
+                    displayMessage = 'Please enter a valid email address.';
+                } else if (error.code === 'auth/too-many-requests') {
+                    displayMessage = 'Too many failed login attempts. Please try again later.';
+                } else if (error.code === 'auth/network-request-failed') {
+                    displayMessage = 'Network error. Please check your internet connection.';
+                } else if (error.code === 'auth/invalid-custom-token') {
+                    displayMessage = 'Invalid login credentials (custom token error).';
                 }
+                else {
+                    displayMessage = `Login failed: ${error.message}`;
+                }
+                loginMessage.textContent = displayMessage;
                 loginMessage.classList.add('error');
+                showMessageBox(displayMessage, 'error');
+            } finally {
+                loginButton.disabled = false; // Re-enable login button
+                googleSignInButton.disabled = false; // Re-enable Google button
             }
         });
 
@@ -367,6 +393,9 @@
         googleSignInButton.addEventListener('click', async () => {
             loginMessage.textContent = 'Signing in with Google...';
             loginMessage.className = 'message info';
+            showMessageBox('Signing in with Google...', 'info');
+            loginButton.disabled = true; // Disable traditional login button
+            googleSignInButton.disabled = true; // Disable Google button itself
 
             try {
                 const provider = new GoogleAuthProvider();
@@ -395,56 +424,31 @@
                 if (backendResponse.ok && backendResult.success) {
                     loginMessage.textContent = backendResult.message;
                     loginMessage.classList.add('success');
-                    window.location.href = 'home.html'; // Redirect after backend confirms
+                    showMessageBox(backendResult.message, 'success');
+                    // For Google Sign-In, the email is usually already verified.
+                    // The onAuthStateChanged listener will handle redirection to home.html
                 } else {
                     loginMessage.textContent = backendResult.message || 'Google sign-in failed on server.';
                     loginMessage.classList.add('error');
+                    showMessageBox(backendResult.message || 'Google sign-in failed on server.', 'error');
                     // Optionally sign out from client-side Firebase if backend fails
                     await firebaseAuthInstance.signOut();
                 }
 
             } catch (error) {
                 console.error('Google Sign-In error:', error);
+                let displayMessage = 'Network error during Google sign-in. Please try again.';
                 if (error.code === 'auth/popup-closed-by-user') {
-                    loginMessage.textContent = 'Google sign-in cancelled.';
+                    displayMessage = 'Google sign-in cancelled.';
                 } else if (error.code) {
-                    loginMessage.textContent = `Google Sign-In Error: ${error.message}`;
-                } else {
-                    loginMessage.textContent = 'Network error during Google sign-in. Please try again.';
+                    displayMessage = `Google Sign-In Error: ${error.message}`;
                 }
+                loginMessage.textContent = displayMessage;
                 loginMessage.classList.add('error');
-            }
-        });
-
-
-        // --- Gemini API Integration for Login Help ---
-        geminiHelpButton.addEventListener('click', async () => {
-            geminiResponseDiv.classList.remove('hidden');
-            geminiResponseDiv.classList.add('loading');
-            geminiResponseDiv.textContent = 'Generating login tips... Please wait.';
-
-            try {
-                const response = await fetch('/api/login-tips', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                });
-
-                const result = await response.json();
-
-                geminiResponseDiv.classList.remove('loading');
-                if (response.ok) {
-                    geminiResponseDiv.innerHTML = '<strong>Here are some tips:</strong><br>' + result.tips;
-                } else {
-                    geminiResponseDiv.textContent = result.message || 'Failed to get login tips. Please try again later.';
-                    geminiResponseDiv.classList.add('error');
-                }
-            } catch (error) {
-                console.error('Error fetching login tips:', error);
-                geminiResponseDiv.classList.remove('loading');
-                geminiResponseDiv.textContent = 'Network error while fetching tips. Please try again.';
-                geminiResponseDiv.classList.add('error');
+                showMessageBox(displayMessage, 'error');
+            } finally {
+                loginButton.disabled = false; // Re-enable traditional login button
+                googleSignInButton.disabled = false; // Re-enable Google button
             }
         });
     </script>
