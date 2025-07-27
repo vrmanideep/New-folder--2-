@@ -6,6 +6,8 @@
     <title>Email Verification</title>
     <!-- Tailwind CSS CDN for easy styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         /* Consistent styling with login/register pages */
         body {
@@ -29,8 +31,8 @@
             max-width: 400px;
             text-align: center;
             border: 1px solid rgba(255, 255, 255, 0.3);
-            backdrop-filter: blur(5px);
             -webkit-backdrop-filter: blur(5px);
+            backdrop-filter: blur(5px);
         }
 
         .verification-container h2 {
@@ -94,6 +96,13 @@
             box-shadow: 0 2px 5px rgba(118, 75, 162, 0.2);
         }
 
+        .action-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
         .message {
             margin-top: 1rem;
             font-size: 0.9rem;
@@ -103,16 +112,6 @@
         .message.error { color: #dc3545; }
         .message.info { color: #007bff; }
         .message.warning { color: #ffc107; }
-
-        .otp-section {
-            display: none; /* Hidden by default */
-            margin-top: 2rem;
-            border-top: 1px solid #eee;
-            padding-top: 1.5rem;
-        }
-        .otp-section .input-group {
-            margin-bottom: 1rem;
-        }
 
         /* Responsive adjustments */
         @media (max-width: 480px) {
@@ -138,147 +137,291 @@
     <div class="verification-container">
         <h2>Verify Your Email</h2>
         <div class="email-section">
+            <p class="text-gray-600 mb-4">
+                A verification link has been sent to your email address. Please check your inbox (and spam folder) and click the link to verify your account.
+            </p>
             <div class="input-group">
                 <label for="email">Email Address</label>
-                <input type="email" id="email" name="email" placeholder="Enter your email" required>
+                <input type="email" id="email" name="email" placeholder="Enter your email" required readonly>
             </div>
-            <button id="send-otp-button" class="action-button">Send OTP</button>
-            <p id="email-message" class="message"></p>
-        </div>
-
-        <div id="otp-section" class="otp-section">
-            <h3>Enter OTP</h3>
-            <div class="input-group">
-                <label for="otp">One-Time Password</label>
-                <input type="text" id="otp" name="otp" placeholder="Enter 6-digit OTP" maxlength="6" required>
-            </div>
-            <button id="verify-otp-button" class="action-button">Verify OTP</button>
-            <p id="otp-message" class="message"></p>
+            <button id="resend-verification-email-button" class="action-button">Resend Verification Email</button>
+            <button id="check-verification-status-button" class="action-button mt-4">I have verified my email</button>
+            <p id="verification-message" class="message"></p>
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        // Import Firebase SDK modules
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
         const emailInput = document.getElementById('email');
-        const sendOtpButton = document.getElementById('send-otp-button');
-        const emailMessage = document.getElementById('email-message');
-        const otpSection = document.getElementById('otp-section');
-        const otpInput = document.getElementById('otp');
-        const verifyOtpButton = document.getElementById('verify-otp-button');
-        const otpMessage = document.getElementById('otp-message');
+        const resendVerificationEmailButton = document.getElementById('resend-verification-email-button');
+        const checkVerificationStatusButton = document.getElementById('check-verification-status-button');
+        const verificationMessage = document.getElementById('verification-message');
 
-        // Function to send OTP
-        async function sendOtp() {
-            const email = emailInput.value.trim();
-            emailMessage.textContent = '';
-            emailMessage.className = 'message';
+        let firebaseApp;
+        let firebaseAuthInstance;
+        let currentUser; // To hold the authenticated user
+        let verificationEmailSentOnce = false; // Flag to prevent sending multiple emails on page load
 
-            if (!email) {
-                emailMessage.textContent = 'Please enter your email address.';
-                emailMessage.classList.add('error');
-                return;
+        // Custom message box function (replaces alert)
+        function showMessageBox(message, type = 'info') {
+            const messageBox = document.createElement('div');
+            messageBox.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white z-[3000]`;
+            
+            let bgColor = '';
+            if (type === 'success') {
+                bgColor = 'bg-green-500';
+            } else if (type === 'error') {
+                bgColor = 'bg-red-500';
+            } else {
+                bgColor = 'bg-blue-500';
             }
+            messageBox.classList.add(bgColor);
+            
+            messageBox.textContent = message;
+            document.body.appendChild(messageBox);
 
-            emailMessage.textContent = 'Checking email and sending OTP...';
-            emailMessage.classList.add('info');
-            sendOtpButton.disabled = true;
+            setTimeout(() => {
+                messageBox.remove();
+            }, 3000); // Message disappears after 3 seconds
+        }
 
+        // Function to fetch client config from backend and initialize Firebase
+        async function fetchFirebaseClientConfigAndInit() {
             try {
-                const response = await fetch('/api/send-otp', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ email }),
-                });
+                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
 
-                const result = await response.json();
+                if (firebaseConfig) {
+                    firebaseApp = initializeApp(firebaseConfig);
+                    firebaseAuthInstance = getAuth(firebaseApp);
+                    console.log("Firebase client app initialized in email_verification.html using global config.");
 
-                if (response.ok) {
-                    emailMessage.textContent = result.message;
-                    emailMessage.classList.add('success');
-                    otpSection.style.display = 'block'; // Show OTP input section
+                    onAuthStateChanged(firebaseAuthInstance, async (user) => {
+                        if (user) {
+                            currentUser = user; // Set current user
+                            console.log("Email Verification Page: User is logged in.", currentUser.uid);
+                            emailInput.value = currentUser.email || ''; // Pre-fill email from logged-in user
+
+                            if (currentUser.emailVerified) {
+                                showMessageBox('Your email is already verified. Redirecting to login page.', 'success');
+                                setTimeout(() => {
+                                    window.location.href = 'login.html'; // Redirect to login.html if already verified
+                                }, 1500);
+                            } else {
+                                // User is logged in but email not verified
+                                verificationMessage.textContent = "Please verify your email to continue.";
+                                verificationMessage.classList.add('info');
+                                showMessageBox('Please verify your email to continue.', 'info');
+
+                                // Automatically send verification email if not sent yet
+                                if (!verificationEmailSentOnce) {
+                                    await resendVerificationEmail(true); // Pass true to indicate auto-send
+                                    verificationEmailSentOnce = true;
+                                }
+                            }
+                        } else {
+                            currentUser = null;
+                            console.log("Email Verification Page: User is logged out.");
+                            // If no user is logged in, attempt to get email from URL, otherwise prompt for login
+                            const urlParams = new URLSearchParams(window.location.search);
+                            const registeredEmail = urlParams.get('email');
+                            if (registeredEmail) {
+                                emailInput.value = registeredEmail;
+                                verificationMessage.textContent = "Please check your email for a verification link.";
+                                verificationMessage.classList.add('info');
+                                showMessageBox('Please check your email for a verification link.', 'info');
+                            } else {
+                                showMessageBox('No active session. Please register or log in.', 'warning');
+                                setTimeout(() => {
+                                    window.location.href = 'login.html'; // Redirect to login if no email and not logged in
+                                }, 2000);
+                            }
+                        }
+                    });
+
                 } else {
-                    emailMessage.textContent = result.message || 'Failed to send OTP. Please try again.';
-                    emailMessage.classList.add('error');
+                    console.warn("Global __firebase_config not found. Attempting to fetch from mock API.");
+                    const response = await fetch('/api/firebase-config');
+                    const config = await response.json();
+                    if (config.success && config.config) {
+                        firebaseApp = initializeApp(config.config);
+                        firebaseAuthInstance = getAuth(firebaseApp);
+                        console.log("Firebase client app initialized from mock API.");
+                        // Re-trigger auth state changed listener after mock init
+                        onAuthStateChanged(firebaseAuthInstance, async (user) => {
+                            if (user) {
+                                currentUser = user;
+                                emailInput.value = currentUser.email || '';
+                                if (currentUser.emailVerified) {
+                                    showMessageBox('Your email is already verified. Redirecting to login page.', 'success');
+                                    setTimeout(() => {
+                                        window.location.href = 'login.html';
+                                    }, 1500);
+                                } else {
+                                    verificationMessage.textContent = "Please verify your email to continue.";
+                                    verificationMessage.classList.add('info');
+                                    showMessageBox('Please verify your email to continue.', 'info');
+                                    if (!verificationEmailSentOnce) {
+                                        await resendVerificationEmail(true);
+                                        verificationEmailSentOnce = true;
+                                    }
+                                }
+                            } else {
+                                const urlParams = new URLSearchParams(window.location.search);
+                                const registeredEmail = urlParams.get('email');
+                                if (registeredEmail) {
+                                    emailInput.value = registeredEmail;
+                                    verificationMessage.textContent = "Please check your email for a verification link.";
+                                    verificationMessage.classList.add('info');
+                                    showMessageBox('Please check your email for a verification link.', 'info');
+                                } else {
+                                    showMessageBox('No active session. Please register or log in.', 'warning');
+                                    setTimeout(() => {
+                                        window.location.href = 'login.html';
+                                    }, 2000);
+                                }
+                            }
+                        });
+                    } else {
+                        console.error("Failed to fetch Firebase client config:", config.message);
+                        showMessageBox("Error: Could not initialize Firebase. Please try again.", "error");
+                    }
                 }
             } catch (error) {
-                console.error('Network error during send OTP:', error);
-                emailMessage.textContent = 'Network error. Please try again later.';
-                emailMessage.classList.add('error');
-            } finally {
-                sendOtpButton.disabled = false;
+                console.error("Error during Firebase initialization:", error);
+                showMessageBox("Network error: Could not initialize Firebase.", "error");
             }
         }
 
-        // Function to verify OTP
-        async function verifyOtp() {
-            const email = emailInput.value.trim(); // Get email again for verification
-            const enteredOtp = otpInput.value.trim();
-            otpMessage.textContent = '';
-            otpMessage.className = 'message';
+        // Function to resend verification email
+        async function resendVerificationEmail(isAutoSend = false) {
+            // Only clear messages if it's not an auto-send on page load
+            if (!isAutoSend) {
+                verificationMessage.textContent = '';
+                verificationMessage.className = 'message';
+                showMessageBox('', 'info'); // Clear previous pop-up message
+            }
 
-            if (!enteredOtp) {
-                otpMessage.textContent = 'Please enter the OTP.';
-                otpMessage.classList.add('error');
+            if (!currentUser) {
+                const msg = 'No user logged in. Please log in or register.';
+                verificationMessage.textContent = msg;
+                verificationMessage.classList.add('error');
+                showMessageBox(msg, 'error');
                 return;
             }
 
-            if (enteredOtp.length !== 6 || isNaN(enteredOtp)) {
-                otpMessage.textContent = 'OTP must be a 6-digit number.';
-                otpMessage.classList.add('error');
+            if (currentUser.emailVerified) {
+                const msg = 'Your email is already verified! Redirecting to login page.';
+                verificationMessage.textContent = msg;
+                verificationMessage.classList.add('success');
+                showMessageBox(msg, 'success');
+                setTimeout(() => {
+                    window.location.href = 'login.html'; // Redirect to login.html if already verified
+                }, 1500);
                 return;
             }
 
-            otpMessage.textContent = 'Verifying OTP...';
-            otpMessage.classList.add('info');
-            verifyOtpButton.disabled = true;
+            const sendingMsg = isAutoSend ? 'Sending verification email automatically...' : 'Sending verification email...';
+            verificationMessage.textContent = sendingMsg;
+            verificationMessage.classList.add('info');
+            resendVerificationEmailButton.disabled = true;
+            checkVerificationStatusButton.disabled = true;
 
             try {
-                const response = await fetch('/api/verify-otp', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ email, otp: enteredOtp }),
-                });
+                await sendEmailVerification(currentUser);
+                const successMsg = isAutoSend ? 'Verification email sent automatically. Please check your inbox.' : 'Verification email sent! Please check your inbox.';
+                verificationMessage.textContent = successMsg;
+                verificationMessage.classList.add('success');
+                showMessageBox(successMsg, 'success');
+            } catch (error) {
+                console.error('Error sending verification email:', error);
+                let errorMessage = 'Failed to send verification email. Please try again.';
+                if (error.code === 'auth/too-many-requests') {
+                    errorMessage = 'Too many requests. Please wait a moment before trying again.';
+                } else if (error.code === 'auth/invalid-user-token') {
+                     errorMessage = 'Session expired. Please log in again to resend verification.';
+                     showMessageBox(errorMessage, 'error');
+                     setTimeout(() => { window.location.href = 'login.html'; }, 2000);
+                     return; // Exit early as we're redirecting
+                }
+                verificationMessage.textContent = errorMessage;
+                verificationMessage.classList.add('error');
+                showMessageBox(errorMessage, 'error');
+            } finally {
+                resendVerificationEmailButton.disabled = false;
+                checkVerificationStatusButton.disabled = false;
+            }
+        }
 
-                const result = await response.json();
+        // Function to check verification status
+        async function checkVerificationStatus() {
+            verificationMessage.textContent = '';
+            verificationMessage.className = 'message';
+            showMessageBox('', 'info'); // Clear previous pop-up message
 
-                if (response.ok) {
-                    otpMessage.textContent = result.message;
-                    otpMessage.classList.add('success');
-                    // Redirect to home page on successful verification
-                    window.location.href = 'home.html';
+            if (!currentUser) {
+                const msg = 'No user logged in. Please log in or register.';
+                verificationMessage.textContent = msg;
+                verificationMessage.classList.add('error');
+                showMessageBox(msg, 'error');
+                return;
+            }
+
+            verificationMessage.textContent = 'Checking verification status...';
+            verificationMessage.classList.add('info');
+            resendVerificationEmailButton.disabled = true;
+            checkVerificationStatusButton.disabled = true;
+
+            try {
+                await currentUser.reload(); // Reload user data to get latest verification status
+                if (currentUser.emailVerified) {
+                    verificationMessage.textContent = 'Email successfully verified! Redirecting to login page...';
+                    verificationMessage.classList.add('success');
+                    showMessageBox('Email successfully verified! Redirecting to login page...', 'success');
+                    setTimeout(() => {
+                        window.location.href = 'login.html'; // Redirect to login.html if verified
+                    }, 1500);
                 } else {
-                    otpMessage.textContent = result.message || 'OTP verification failed. Please try again.';
-                    otpMessage.classList.add('error');
+                    verificationMessage.textContent = 'Email is not yet verified. Please click the link in your email.';
+                    verificationMessage.classList.add('warning');
+                    showMessageBox('Email is not yet verified. Please click the link in your email.', 'warning');
                 }
             } catch (error) {
-                console.error('Network error during OTP verification:', error);
-                otpMessage.textContent = 'Network error. Please try again later.';
-                otpMessage.classList.add('error');
+                console.error('Error checking verification status:', error);
+                let errorMessage = 'Error checking status. Please try again.';
+                if (error.code === 'auth/network-request-failed') {
+                    errorMessage = 'Network error. Please check your internet connection.';
+                } else if (error.code === 'auth/user-token-expired' || error.code === 'auth/invalid-user-token') {
+                    errorMessage = 'Your session has expired. Please log in again.';
+                    showMessageBox(errorMessage, 'error');
+                    setTimeout(() => { window.location.href = 'login.html'; }, 2000);
+                    return; // Exit early as we're redirecting
+                }
+                verificationMessage.textContent = errorMessage;
+                verificationMessage.classList.add('error');
+                showMessageBox(errorMessage, 'error');
             } finally {
-                verifyOtpButton.disabled = false;
+                resendVerificationEmailButton.disabled = false;
+                checkVerificationStatusButton.disabled = false;
             }
         }
 
         // Event Listeners
-        sendOtpButton.addEventListener('click', sendOtp);
-        verifyOtpButton.addEventListener('click', verifyOtp);
+        resendVerificationEmailButton.addEventListener('click', () => resendVerificationEmail(false)); // Not an auto-send
+        checkVerificationStatusButton.addEventListener('click', checkVerificationStatus);
 
-        emailInput.addEventListener('keypress', function(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                sendOtp();
-            }
-        });
+        // Initialize Firebase on page load
+        document.addEventListener('DOMContentLoaded', fetchFirebaseClientConfigAndInit);
 
-        otpInput.addEventListener('keypress', function(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                verifyOtp();
-            }
-        });
+        // Pre-fill email from URL parameter if available (e.g., from register.html?email=user@example.com)
+        // This will be overridden by onAuthStateChanged if a user is logged in.
+        const urlParams = new URLSearchParams(window.location.search);
+        const registeredEmailFromUrl = urlParams.get('email');
+        if (registeredEmailFromUrl) {
+            emailInput.value = registeredEmailFromUrl;
+        }
     </script>
 </body>
 </html>
