@@ -151,277 +151,269 @@
     </div>
 
     <script type="module">
-        // Import Firebase SDK modules
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-        import { getAuth, onAuthStateChanged, sendEmailVerification } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+    // Import Firebase SDK modules
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import { getAuth, onAuthStateChanged, sendEmailVerification, signInWithCustomToken, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-        const emailInput = document.getElementById('email');
-        const resendVerificationEmailButton = document.getElementById('resend-verification-email-button');
-        const checkVerificationStatusButton = document.getElementById('check-verification-status-button');
-        const verificationMessage = document.getElementById('verification-message');
+    const emailDisplay = document.getElementById('email-display');
+    const resendEmailButton = document.getElementById('resend-email-button');
+    const verificationMessage = document.getElementById('verification-message');
+    const checkVerificationButton = document.getElementById('check-verification-button');
 
-        let firebaseApp;
-        let firebaseAuthInstance;
-        let currentUser; // To hold the authenticated user
-        let verificationEmailSentOnce = false; // Flag to prevent sending multiple emails on page load
+    let firebaseApp;
+    let firebaseAuth;
+    let currentUser; // Stores the current authenticated Firebase user object
 
-        // Custom message box function (replaces alert)
-        function showMessageBox(message, type = 'info') {
-            const messageBox = document.createElement('div');
-            messageBox.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white z-[3000]`;
-            
-            let bgColor = '';
-            if (type === 'success') {
-                bgColor = 'bg-green-500';
-            } else if (type === 'error') {
-                bgColor = 'bg-red-500';
-            } else {
-                bgColor = 'bg-blue-500';
-            }
-            messageBox.classList.add(bgColor);
-            
-            messageBox.textContent = message;
-            document.body.appendChild(messageBox);
-
-            setTimeout(() => {
-                messageBox.remove();
-            }, 3000); // Message disappears after 3 seconds
+    // Custom message box function (replaces alert)
+    function showMessageBox(message, type = 'info') {
+        const messageBox = document.createElement('div');
+        messageBox.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white z-[3000]`;
+        
+        let bgColor = '';
+        if (type === 'success') {
+            bgColor = 'bg-green-500';
+        } else if (type === 'error') {
+            bgColor = 'bg-red-500';
+        } else {
+            bgColor = 'bg-blue-500';
         }
+        messageBox.classList.add(bgColor);
+        
+        messageBox.textContent = message;
+        document.body.appendChild(messageBox);
 
-        // Function to fetch client config from backend and initialize Firebase
-        async function fetchFirebaseClientConfigAndInit() {
-            try {
-                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        setTimeout(() => {
+            messageBox.remove();
+        }, 3000); // Message disappears after 3 seconds
+    }
 
-                if (firebaseConfig) {
-                    firebaseApp = initializeApp(firebaseConfig);
-                    firebaseAuthInstance = getAuth(firebaseApp);
-                    console.log("Firebase client app initialized in email_verification.html using global config.");
+    // Function to fetch client config from backend and initialize Firebase
+    async function fetchFirebaseClientConfigAndInit() {
+        console.log("fetchFirebaseClientConfigAndInit called.");
+        let configToUse = null;
+        let tokenToUse = null;
 
-                    onAuthStateChanged(firebaseAuthInstance, async (user) => {
-                        if (user) {
-                            currentUser = user; // Set current user
-                            console.log("Email Verification Page: User is logged in.", currentUser.uid);
-                            emailInput.value = currentUser.email || ''; // Pre-fill email from logged-in user
+        try {
+            // 1. Try to get config and token from Canvas global variables
+            if (typeof __firebase_config !== 'undefined' && __firebase_config !== null) {
+                configToUse = JSON.parse(__firebase_config);
+                console.log("Firebase Config loaded from __firebase_config global.");
+            }
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token !== null) {
+                tokenToUse = __initial_auth_token;
+                console.log("Initial Auth Token loaded from __initial_auth_token global.");
+            }
 
-                            if (currentUser.emailVerified) {
-                                showMessageBox('Your email is already verified. Redirecting to login page.', 'success');
-                                setTimeout(() => {
-                                    window.location.href = 'login.html'; // Redirect to login.html if already verified
-                                }, 1500);
-                            } else {
-                                // User is logged in but email not verified
-                                verificationMessage.textContent = "Please verify your email to continue.";
-                                verificationMessage.classList.add('info');
-                                showMessageBox('Please verify your email to continue.', 'info');
-
-                                // Automatically send verification email if not sent yet
-                                if (!verificationEmailSentOnce) {
-                                    await resendVerificationEmail(true); // Pass true to indicate auto-send
-                                    verificationEmailSentOnce = true;
-                                }
-                            }
-                        } else {
-                            currentUser = null;
-                            console.log("Email Verification Page: User is logged out.");
-                            // If no user is logged in, attempt to get email from URL, otherwise prompt for login
-                            const urlParams = new URLSearchParams(window.location.search);
-                            const registeredEmail = urlParams.get('email');
-                            if (registeredEmail) {
-                                emailInput.value = registeredEmail;
-                                verificationMessage.textContent = "Please check your email for a verification link.";
-                                verificationMessage.classList.add('info');
-                                showMessageBox('Please check your email for a verification link.', 'info');
-                            } else {
-                                showMessageBox('No active session. Please register or log in.', 'warning');
-                                setTimeout(() => {
-                                    window.location.href = 'login.html'; // Redirect to login if no email and not logged in
-                                }, 2000);
-                            }
-                        }
-                    });
-
+            // 2. If Canvas globals are not available, fetch from backend API (for local dev/fallback)
+            if (!configToUse) {
+                console.warn("Canvas global __firebase_config not found. Attempting to fetch from /api/firebase-config.");
+                const response = await fetch('/api/firebase-config');
+                const configResult = await response.json();
+                if (configResult.success && configResult.config) {
+                    configToUse = configResult.config;
+                    console.log("Firebase client config fetched from /api/firebase-config.");
                 } else {
-                    console.warn("Global __firebase_config not found. Attempting to fetch from mock API.");
-                    const response = await fetch('/api/firebase-config');
-                    const config = await response.json();
-                    if (config.success && config.config) {
-                        firebaseApp = initializeApp(config.config);
-                        firebaseAuthInstance = getAuth(firebaseApp);
-                        console.log("Firebase client app initialized from mock API.");
-                        // Re-trigger auth state changed listener after mock init
-                        onAuthStateChanged(firebaseAuthInstance, async (user) => {
-                            if (user) {
-                                currentUser = user;
-                                emailInput.value = currentUser.email || '';
-                                if (currentUser.emailVerified) {
-                                    showMessageBox('Your email is already verified. Redirecting to login page.', 'success');
-                                    setTimeout(() => {
-                                        window.location.href = 'login.html';
-                                    }, 1500);
-                                } else {
-                                    verificationMessage.textContent = "Please verify your email to continue.";
-                                    verificationMessage.classList.add('info');
-                                    showMessageBox('Please verify your email to continue.', 'info');
-                                    if (!verificationEmailSentOnce) {
-                                        await resendVerificationEmail(true);
-                                        verificationEmailSentOnce = true;
-                                    }
-                                }
-                            } else {
-                                const urlParams = new URLSearchParams(window.location.search);
-                                const registeredEmail = urlParams.get('email');
-                                if (registeredEmail) {
-                                    emailInput.value = registeredEmail;
-                                    verificationMessage.textContent = "Please check your email for a verification link.";
-                                    verificationMessage.classList.add('info');
-                                    showMessageBox('Please check your email for a verification link.', 'info');
-                                } else {
-                                    showMessageBox('No active session. Please register or log in.', 'warning');
-                                    setTimeout(() => {
-                                        window.location.href = 'login.html';
-                                    }, 2000);
-                                }
-                            }
-                        });
-                    } else {
-                        console.error("Failed to fetch Firebase client config:", config.message);
-                        showMessageBox("Error: Could not initialize Firebase. Please try again.", "error");
+                    console.error("Failed to fetch Firebase client config from backend:", configResult.message);
+                    showMessageBox("Error: Could not initialize Firebase. Please try again.", "error");
+                    // Redirect to login or show critical error if config cannot be obtained
+                    if (window.location.pathname !== '/login.html') {
+                        window.location.href = 'login.html';
+                    }
+                    return; // Stop execution if config is not available
+                }
+            }
+
+            // Initialize Firebase App
+            if (!firebaseApp) { // Only initialize if not already initialized
+                firebaseApp = initializeApp(configToUse);
+                firebaseAuth = getAuth(firebaseApp);
+                console.log("Firebase client app initialized.");
+            }
+
+            // Handle initial authentication (only for login.html and home.html where it's relevant)
+            if (window.location.pathname.includes('home.html') || window.location.pathname.includes('login.html')) {
+                if (tokenToUse) {
+                    try {
+                        await signInWithCustomToken(firebaseAuth, tokenToUse);
+                        console.log("Signed in with custom token.");
+                    } catch (e) {
+                        console.warn("Custom token sign-in failed, attempting anonymous sign-in or redirect:", e);
+                        await signInAnonymously(firebaseAuth); // Fallback
+                    }
+                } else {
+                    await signInAnonymously(firebaseAuth); // Sign in anonymously if no custom token
+                    console.log("Signed in anonymously.");
+                }
+            }
+
+
+            // Set up the Auth State Changed listener (crucial for all pages)
+            onAuthStateChanged(firebaseAuth, (user) => {
+                console.log("Auth state changed, user:", user ? user.uid : "null");
+                if (user) {
+                    currentUser = user; // Set current user globally
+                    // Page-specific UI updates and redirections
+                    if (window.location.pathname.includes('home.html')) {
+                        // This block won't be hit on email_verification.html, but kept for general script
+                        // updateUserUI(currentUser);
+                        // updateWelcomeMessage(currentUser);
+                    } else if (window.location.pathname.includes('login.html') || window.location.pathname.includes('register.html')) {
+                        if (user.emailVerified) {
+                            window.location.href = 'home.html';
+                        } else {
+                            showMessageBox('Please verify your email to continue.', 'warning');
+                            window.location.href = `email_verification.html?email=${encodeURIComponent(user.email)}`;
+                        }
+                    } else if (window.location.pathname.includes('email_verification.html')) {
+                        // On email_verification page, if user becomes verified, redirect to login
+                        if (user.emailVerified) {
+                            showMessageBox('Your email is verified. Redirecting to login.', 'success');
+                            setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+                        } else {
+                            // If user is logged in but email not verified, stay on this page
+                            emailDisplay.textContent = currentUser.email || 'your email';
+                            verificationMessage.textContent = 'A verification email has been sent to your inbox. Please check your spam folder.';
+                            verificationMessage.classList.add('info');
+                        }
+                    }
+                } else {
+                    currentUser = null; // Clear current user
+                    // If user logs out or session expires, redirect to login
+                    if (!window.location.pathname.includes('login.html') && !window.location.pathname.includes('register.html')) {
+                        console.log("User logged out or session expired. Redirecting to login.");
+                        window.location.href = 'login.html';
                     }
                 }
-            } catch (error) {
-                console.error("Error during Firebase initialization:", error);
-                showMessageBox("Network error: Could not initialize Firebase.", "error");
+            });
+
+        } catch (error) {
+            console.error("Critical error during Firebase initialization or auth:", error);
+            showMessageBox("Critical error: Could not initialize application. Please try again.", "error");
+            // Fallback to login page if anything goes wrong
+            if (window.location.pathname !== '/login.html') {
+                window.location.href = 'login.html';
             }
         }
+    }
 
-        // Function to resend verification email
-        async function resendVerificationEmail(isAutoSend = false) {
-            // Only clear messages if it's not an auto-send on page load
-            if (!isAutoSend) {
-                verificationMessage.textContent = '';
-                verificationMessage.className = 'message';
-                showMessageBox('', 'info'); // Clear previous pop-up message
-            }
-
-            if (!currentUser) {
-                const msg = 'No user logged in. Please log in or register.';
-                verificationMessage.textContent = msg;
-                verificationMessage.classList.add('error');
-                showMessageBox(msg, 'error');
-                return;
-            }
-
-            if (currentUser.emailVerified) {
-                const msg = 'Your email is already verified! Redirecting to login page.';
-                verificationMessage.textContent = msg;
-                verificationMessage.classList.add('success');
-                showMessageBox(msg, 'success');
-                setTimeout(() => {
-                    window.location.href = 'login.html'; // Redirect to login.html if already verified
-                }, 1500);
-                return;
-            }
-
-            const sendingMsg = isAutoSend ? 'Sending verification email automatically...' : 'Sending verification email...';
-            verificationMessage.textContent = sendingMsg;
-            verificationMessage.classList.add('info');
-            resendVerificationEmailButton.disabled = true;
-            checkVerificationStatusButton.disabled = true;
+    resendEmailButton.addEventListener('click', async () => {
+        if (currentUser && !currentUser.emailVerified) {
+            verificationMessage.textContent = 'Sending new verification email...';
+            verificationMessage.className = 'status-message info';
+            resendEmailButton.disabled = true;
 
             try {
-                await sendEmailVerification(currentUser);
-                const successMsg = isAutoSend ? 'Verification email sent automatically. Please check your inbox.' : 'Verification email sent! Please check your inbox.';
-                verificationMessage.textContent = successMsg;
-                verificationMessage.classList.add('success');
-                showMessageBox(successMsg, 'success');
-            } catch (error) {
-                console.error('Error sending verification email:', error);
-                let errorMessage = 'Failed to send verification email. Please try again.';
-                if (error.code === 'auth/too-many-requests') {
-                    errorMessage = 'Too many requests. Please wait a moment before trying again.';
-                } else if (error.code === 'auth/invalid-user-token') {
-                     errorMessage = 'Session expired. Please log in again to resend verification.';
-                     showMessageBox(errorMessage, 'error');
-                     setTimeout(() => { window.location.href = 'login.html'; }, 2000);
-                     return; // Exit early as we're redirecting
-                }
-                verificationMessage.textContent = errorMessage;
-                verificationMessage.classList.add('error');
-                showMessageBox(errorMessage, 'error');
-            } finally {
-                resendVerificationEmailButton.disabled = false;
-                checkVerificationStatusButton.disabled = false;
-            }
-        }
+                // Use backend API to resend verification email for better control/logging
+                const idToken = await currentUser.getIdToken();
+                const response = await fetch('/api/resend-verification-email', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${idToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const result = await response.json();
 
-        // Function to check verification status
-        async function checkVerificationStatus() {
-            verificationMessage.textContent = '';
-            verificationMessage.className = 'message';
-            showMessageBox('', 'info'); // Clear previous pop-up message
-
-            if (!currentUser) {
-                const msg = 'No user logged in. Please log in or register.';
-                verificationMessage.textContent = msg;
-                verificationMessage.classList.add('error');
-                showMessageBox(msg, 'error');
-                return;
-            }
-
-            verificationMessage.textContent = 'Checking verification status...';
-            verificationMessage.classList.add('info');
-            resendVerificationEmailButton.disabled = true;
-            checkVerificationStatusButton.disabled = true;
-
-            try {
-                await currentUser.reload(); // Reload user data to get latest verification status
-                if (currentUser.emailVerified) {
-                    verificationMessage.textContent = 'Email successfully verified! Redirecting to login page...';
+                if (response.ok && result.success) {
+                    verificationMessage.textContent = 'New verification email sent! Check your inbox.';
                     verificationMessage.classList.add('success');
-                    showMessageBox('Email successfully verified! Redirecting to login page...', 'success');
-                    setTimeout(() => {
-                        window.location.href = 'login.html'; // Redirect to login.html if verified
-                    }, 1500);
                 } else {
-                    verificationMessage.textContent = 'Email is not yet verified. Please click the link in your email.';
+                    verificationMessage.textContent = result.message || 'Failed to send verification email.';
+                    verificationMessage.classList.add('error');
+                }
+            } catch (error) {
+                console.error('Error resending verification email:', error);
+                verificationMessage.textContent = 'Network error. Could not resend email.';
+                verificationMessage.classList.add('error');
+            } finally {
+                resendEmailButton.disabled = false;
+            }
+        } else if (currentUser && currentUser.emailVerified) {
+            verificationMessage.textContent = 'Your email is already verified. Redirecting to login...';
+            verificationMessage.classList.add('success');
+            setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+        } else {
+            verificationMessage.textContent = 'No user logged in or email not found.';
+            verificationMessage.classList.add('error');
+        }
+    });
+
+    checkVerificationButton.addEventListener('click', async () => {
+        if (currentUser) {
+            verificationMessage.textContent = 'Checking verification status...';
+            verificationMessage.className = 'status-message info';
+            checkVerificationButton.disabled = true;
+
+            try {
+                // Reload user to get the latest emailVerified status
+                await currentUser.reload();
+                if (currentUser.emailVerified) {
+                    verificationMessage.textContent = 'Your email is now verified! Redirecting to login...';
+                    verificationMessage.classList.add('success');
+                    setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+                } else {
+                    verificationMessage.textContent = 'Email is still not verified. Please check your inbox or resend.';
                     verificationMessage.classList.add('warning');
-                    showMessageBox('Email is not yet verified. Please click the link in your email.', 'warning');
                 }
             } catch (error) {
                 console.error('Error checking verification status:', error);
-                let errorMessage = 'Error checking status. Please try again.';
-                if (error.code === 'auth/network-request-failed') {
-                    errorMessage = 'Network error. Please check your internet connection.';
-                } else if (error.code === 'auth/user-token-expired' || error.code === 'auth/invalid-user-token') {
-                    errorMessage = 'Your session has expired. Please log in again.';
-                    showMessageBox(errorMessage, 'error');
-                    setTimeout(() => { window.location.href = 'login.html'; }, 2000);
-                    return; // Exit early as we're redirecting
-                }
-                verificationMessage.textContent = errorMessage;
+                verificationMessage.textContent = 'Error checking status. Please try again.';
                 verificationMessage.classList.add('error');
-                showMessageBox(errorMessage, 'error');
             } finally {
-                resendVerificationEmailButton.disabled = false;
-                checkVerificationStatusButton.disabled = false;
+                checkVerificationButton.disabled = false;
             }
+        } else {
+            verificationMessage.textContent = 'No user logged in.';
+            verificationMessage.classList.add('error');
         }
+    });
 
-        // Event Listeners
-        resendVerificationEmailButton.addEventListener('click', () => resendVerificationEmail(false)); // Not an auto-send
-        checkVerificationStatusButton.addEventListener('click', checkVerificationStatus);
+    // Light/Dark Mode Toggle Logic
+    const themeToggleButton = document.getElementById('theme-toggle');
+    const themeIcon = document.getElementById('theme-icon');
 
-        // Initialize Firebase on page load
-        document.addEventListener('DOMContentLoaded', fetchFirebaseClientConfigAndInit);
+    function applyTheme(theme) {
+        if (theme === 'dark') {
+            document.body.classList.remove('light-mode');
+            themeIcon.textContent = '🌙'; // Moon icon for dark mode
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.body.classList.add('light-mode');
+            themeIcon.textContent = '☀️'; // Sun icon for light mode
+            localStorage.setItem('theme', 'light');
+        }
+    }
 
-        // Pre-fill email from URL parameter if available (e.g., from register.html?email=user@example.com)
-        // This will be overridden by onAuthStateChanged if a user is logged in.
+    function toggleTheme() {
+        const currentTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        if (currentTheme === 'dark') {
+            applyTheme('light');
+        } else {
+            applyTheme('dark');
+        }
+    }
+
+    themeToggleButton.addEventListener('click', toggleTheme);
+
+    // Apply theme on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchFirebaseClientConfigAndInit(); // Initialize Firebase first
         const urlParams = new URLSearchParams(window.location.search);
-        const registeredEmailFromUrl = urlParams.get('email');
-        if (registeredEmailFromUrl) {
-            emailInput.value = registeredEmailFromUrl;
+        const emailFromUrl = urlParams.get('email');
+        if (emailFromUrl) {
+            emailDisplay.textContent = emailFromUrl;
         }
-    </script>
+
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+            applyTheme(savedTheme);
+        } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            applyTheme('dark');
+        } else {
+            applyTheme('light');
+        }
+    });
+</script>
+
 </body>
 </html>
