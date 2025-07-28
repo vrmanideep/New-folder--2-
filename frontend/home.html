@@ -834,7 +834,7 @@
             }
             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token !== null) {
                 tokenToUse = __initial_auth_token;
-                console.log("Initial Auth Token loaded from __initial_auth_token global.");
+                console.log("Initial Auth Token loaded from __initial_auth_token global:", tokenToUse ? "present" : "absent");
             }
 
             // 2. If Canvas globals are not available, fetch from backend API (for local dev/fallback)
@@ -891,19 +891,28 @@
                 }
             }
 
-            // Handle initial authentication (only for login.html and home.html where it's relevant)
-            if (window.location.pathname.includes('home.html') || window.location.pathname.includes('login.html')) {
+            // Handle initial authentication for home.html
+            if (window.location.pathname.includes('home.html')) {
                 if (tokenToUse) {
                     try {
                         await signInWithCustomToken(firebaseAuth, tokenToUse);
-                        console.log("Signed in with custom token.");
+                        console.log("Signed in with custom token on home.html.");
                     } catch (e) {
-                        console.warn("Custom token sign-in failed, attempting anonymous sign-in or redirect:", e);
-                        await signInAnonymously(firebaseAuth); // Fallback
+                        console.warn("Custom token sign-in failed on home.html:", e);
+                        // If custom token fails, and no user is currently authenticated, redirect to login
+                        if (!firebaseAuth.currentUser) {
+                            console.log("No current user after custom token failure. Redirecting to login.");
+                            window.location.href = 'login.html';
+                        }
                     }
                 } else {
-                    await signInAnonymously(firebaseAuth); // Sign in anonymously if no custom token
-                    console.log("Signed in anonymously.");
+                    // If no initial token, check if user is already authenticated. If not, redirect to login.
+                    // The onAuthStateChanged listener will handle existing sessions.
+                    // This block ensures unauthenticated users don't linger on home.html without a token.
+                    if (!firebaseAuth.currentUser) {
+                        console.log("No initial auth token and no current user. Redirecting to login.");
+                        window.location.href = 'login.html';
+                    }
                 }
             }
 
@@ -914,7 +923,6 @@
                 if (user) {
                     currentUser = user; // Set current user globally
                     // Page-specific UI updates and redirections
-                    // For home.html, just update UI, no email verification check needed here
                     if (window.location.pathname.includes('home.html')) {
                         updateUserUI(currentUser);
                         updateWelcomeMessage(currentUser);
@@ -929,7 +937,6 @@
                         console.log("User logged out or session expired. Redirecting to login.");
                         window.location.href = 'login.html';
                     }
-                    // For login/register pages, if user logs out, they stay on the page.
                 }
             });
 
