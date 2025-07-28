@@ -12,6 +12,7 @@ from . import firebase_config
 users_collection = firebase_config.db.collection(f'artifacts/{firebase_config.APP_ID}/public/data/users')
 user_profiles_collection = firebase_config.db.collection(f'artifacts/{firebase_config.APP_ID}/public/data/user_profiles')
 usernames_collection = firebase_config.db.collection(f'artifacts/{firebase_config.APP_ID}/public/data/usernames')
+feedback_collection = firebase_config.db.collection(f'artifacts/{firebase_config.APP_ID}/public/data/feedback') # NEW: Feedback collection
 
 
 def generate_random_password(length=12):
@@ -356,3 +357,30 @@ def handle_google_auth_backend(id_token, display_name, email, photo_url):
     except Exception as e:
         print(f"Unexpected error during Google auth backend: {e}")
         return {"success": False, "message": "An unexpected error occurred during Google authentication."}
+
+
+def save_feedback_backend(uid, feedback_message):
+    """
+    Saves user feedback to the Firestore 'feedback' collection.
+    """
+    try:
+        # Get user details for context
+        user_profile_doc = user_profiles_collection.document(uid).get()
+        user_data = user_profile_doc.to_dict() if user_profile_doc.exists else {}
+        
+        feedback_data = {
+            'uid': uid,
+            'message': feedback_message,
+            'timestamp': firestore.SERVER_TIMESTAMP,
+            'user_email': user_data.get('email', 'N/A'),
+            'user_username': user_data.get('username', 'N/A'),
+            'user_name': user_data.get('name', 'N/A')
+        }
+        
+        feedback_collection.add(feedback_data) # Use add() for auto-generated document ID
+        print(f"Feedback from {uid} saved to Firestore.")
+        return {"success": True, "message": "Feedback saved successfully!"}
+    except Exception as e:
+        print(f"Error saving feedback to Firestore: {e}")
+        return {"success": False, "message": f"Failed to save feedback: {str(e)}"}
+
