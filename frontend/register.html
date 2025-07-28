@@ -262,11 +262,11 @@
                 <label for="confirm-password">Confirm Password</label>
                 <input type="password" id="confirm-password" name="confirm-password" placeholder="Confirm your password" required>
             </div>
-            <button type="submit" class="register-button">Register</button>
+            <button type="submit" id="register-button" class="register-button" disabled>Register</button>
             <p id="register-message" class="message"></p>
         </form>
 
-        <button id="google-signin-button" class="google-signin-button">
+        <button id="google-signin-button" class="google-signin-button" disabled>
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google logo">
             Sign up with Google
         </button>
@@ -292,12 +292,15 @@
     const emailInput = document.getElementById('email'); // Ensure email input is captured
     const passwordInput = document.getElementById('password');
     const confirmPasswordInput = document.getElementById('confirm-password');
+    const registerButton = document.getElementById('register-button'); // Added ID to button and referenced here
+    const googleSigninButton = document.getElementById('google-signin-button'); // Added ID to button and referenced here
     const registerMessage = document.getElementById('register-message');
     const usernameStatus = document.getElementById('username-status');
 
     let firebaseApp;
     let firebaseAuth;
     let currentUser; // Stores the current authenticated Firebase user object
+    let isFirebaseReady = false; // New flag for Firebase initialization status
 
     // Custom message box function (replaces alert)
     function showMessageBox(message, type = 'info') {
@@ -354,7 +357,6 @@
                 }
             }
 
-            // --- ADDED DEBUG LOG HERE ---
             console.log("DEBUG: Config object before initializeApp:", configToUse);
 
             // Initialize Firebase App
@@ -362,6 +364,10 @@
                 firebaseApp = initializeApp(configToUse);
                 firebaseAuth = getAuth(firebaseApp);
                 console.log("Firebase client app initialized.");
+                isFirebaseReady = true; // Set flag to true after successful initialization
+                // Enable buttons after Firebase is ready
+                registerButton.disabled = false;
+                googleSigninButton.disabled = false;
             }
 
             // Handle initial authentication (only for login.html and home.html where it's relevant)
@@ -402,6 +408,10 @@
         } catch (error) {
             console.error("Critical error during Firebase initialization or auth:", error);
             showMessageBox("Critical error: Could not initialize application. Please try again.", "error");
+            // Ensure firebaseAuth is explicitly nullified on error
+            firebaseApp = null;
+            firebaseAuth = null;
+            isFirebaseReady = false; // Set flag to false on error
             // Fallback to login page if anything goes wrong
             if (window.location.pathname !== '/login.html') {
                 window.location.href = 'login.html';
@@ -476,6 +486,14 @@
         if (password !== confirmPassword) {
             registerMessage.textContent = 'Passwords do not match.';
             registerMessage.classList.add('error');
+            return;
+        }
+
+        // Ensure firebaseAuth is initialized before proceeding
+        if (!isFirebaseReady || !firebaseAuth) {
+            registerMessage.textContent = 'Initializing Firebase. Please wait...';
+            registerMessage.classList.add('info');
+            console.error("Firebase Auth is not initialized when register form submitted.");
             return;
         }
 
@@ -555,6 +573,10 @@
 
     // Apply theme on page load
     document.addEventListener('DOMContentLoaded', () => {
+        // Initially disable register buttons until Firebase is ready
+        registerButton.disabled = true;
+        googleSigninButton.disabled = true;
+
         fetchFirebaseClientConfigAndInit(); // Initialize Firebase first
         const savedTheme = localStorage.getItem('theme');
         if (savedTheme) {
