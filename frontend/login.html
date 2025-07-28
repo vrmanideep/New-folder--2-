@@ -193,11 +193,11 @@
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password" placeholder="Enter your password" required>
             </div>
-            <button type="submit" class="login-button">Login</button>
+            <button type="submit" id="login-button" class="login-button" disabled>Login</button>
             <p id="login-message" class="message"></p>
         </form>
 
-        <button id="google-signin-button" class="google-signin-button">
+        <button id="google-signin-button" class="google-signin-button" disabled>
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google logo">
             Sign in with Google
         </button>
@@ -216,17 +216,13 @@
     const identifierInput = document.getElementById('identifier');
     const passwordInput = document.getElementById('password');
     const loginMessage = document.getElementById('login-message');
+    const loginButton = document.getElementById('login-button'); // Added ID to button and referenced here
     const googleLoginButton = document.getElementById('google-signin-button'); // Fixed ID: was 'google-login-button'
-    // Removed references to non-existent HTML elements:
-    // const forgotPasswordLink = document.getElementById('forgot-password-link');
-    // const loginTipsButton = document.getElementById('login-tips-button');
-    // const loginTipsModalOverlay = document.getElementById('login-tips-modal-overlay');
-    // const loginTipsContent = document.getElementById('login-tips-content');
-    // const closeLoginTipsModalButton = document.getElementById('close-login-tips-modal');
 
     let firebaseApp;
     let firebaseAuth;
     let currentUser; // Stores the current authenticated Firebase user object
+    let isFirebaseReady = false; // New flag for Firebase initialization status
 
     // Custom message box function (replaces alert)
     function showMessageBox(message, type = 'info') {
@@ -283,7 +279,6 @@
                 }
             }
 
-            // --- ADDED DEBUG LOG HERE ---
             console.log("DEBUG: Config object before initializeApp:", configToUse);
 
             // Initialize Firebase App
@@ -291,6 +286,10 @@
                 firebaseApp = initializeApp(configToUse);
                 firebaseAuth = getAuth(firebaseApp);
                 console.log("Firebase client app initialized.");
+                isFirebaseReady = true; // Set flag to true after successful initialization
+                // Enable buttons after Firebase is ready
+                loginButton.disabled = false;
+                googleLoginButton.disabled = false;
             }
 
             // Handle initial authentication (only for login.html and home.html where it's relevant)
@@ -323,10 +322,6 @@
                         // For login/register, if user is authenticated, always redirect to home
                         window.location.href = 'home.html';
                     }
-                    // Removed email_verification.html redirect as per user request
-                    // else if (window.location.pathname.includes('email_verification.html')) {
-                    //     window.location.href = 'home.html';
-                    // }
                 } else {
                     currentUser = null; // Clear current user
                     // On login/register pages, if user logs out, they stay on the page.
@@ -341,6 +336,10 @@
         } catch (error) {
             console.error("Critical error during Firebase initialization or auth:", error);
             showMessageBox("Critical error: Could not initialize application. Please try again.", "error");
+            // Ensure firebaseAuth is explicitly nullified on error
+            firebaseApp = null;
+            firebaseAuth = null;
+            isFirebaseReady = false; // Set flag to false on error
             // Fallback to login page if anything goes wrong
             if (window.location.pathname !== '/login.html') {
                 window.location.href = 'login.html';
@@ -364,9 +363,9 @@
         }
 
         // Ensure firebaseAuth is initialized before proceeding
-        if (!firebaseAuth) {
-            loginMessage.textContent = 'Firebase is not initialized. Please try again or refresh the page.';
-            loginMessage.classList.add('error');
+        if (!isFirebaseReady || !firebaseAuth) {
+            loginMessage.textContent = 'Initializing Firebase. Please wait...';
+            loginMessage.classList.add('info');
             console.error("Firebase Auth is not initialized when login form submitted.");
             return;
         }
@@ -451,7 +450,7 @@
 
     googleLoginButton.addEventListener('click', async () => {
         // Ensure firebaseAuth is initialized before proceeding
-        if (!firebaseAuth) {
+        if (!isFirebaseReady || !firebaseAuth) {
             showMessageBox('Firebase is not initialized. Please try again or refresh the page.', 'error');
             console.error("Firebase Auth is not initialized when Google login button clicked.");
             return;
@@ -514,11 +513,6 @@
         }
     });
 
-    // Removed event listeners for non-existent elements
-    // forgotPasswordLink.addEventListener('click', async (event) => { /* ... */ });
-    // loginTipsButton.addEventListener('click', async () => { /* ... */ });
-    // closeLoginTipsModalButton.addEventListener('click', () => { /* ... */ });
-
     // Light/Dark Mode Toggle Logic
     const themeToggleButton = document.getElementById('theme-toggle');
     const themeIcon = document.getElementById('theme-icon');
@@ -548,6 +542,10 @@
 
     // Apply theme on page load
     document.addEventListener('DOMContentLoaded', () => {
+        // Initially disable login buttons until Firebase is ready
+        loginButton.disabled = true;
+        googleLoginButton.disabled = true;
+
         fetchFirebaseClientConfigAndInit(); // Initialize Firebase first
         const savedTheme = localStorage.getItem('theme');
         if (savedTheme) {
