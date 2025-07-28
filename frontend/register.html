@@ -354,6 +354,9 @@
                 }
             }
 
+            // --- ADDED DEBUG LOG HERE ---
+            console.log("DEBUG: Config object before initializeApp:", configToUse);
+
             // Initialize Firebase App
             if (!firebaseApp) { // Only initialize if not already initialized
                 firebaseApp = initializeApp(configToUse);
@@ -365,7 +368,7 @@
             if (window.location.pathname.includes('home.html') || window.location.pathname.includes('login.html')) {
                 if (tokenToUse) {
                     try {
-                        await signInWithCustomToken(firebaseAuth, tokenToToUse);
+                        await signInWithCustomToken(firebaseAuth, tokenToUse);
                         console.log("Signed in with custom token.");
                     } catch (e) {
                         console.warn("Custom token sign-in failed, attempting anonymous sign-in or redirect:", e);
