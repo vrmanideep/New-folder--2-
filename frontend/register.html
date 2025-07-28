@@ -325,7 +325,7 @@
 <script type="module">
     // Import Firebase SDK modules
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import { getAuth, onAuthStateChanged, signInWithCustomToken, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+    import { getAuth, onAuthStateChanged, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
     const registerForm = document.getElementById('register-form');
     const nameInput = document.getElementById('name');
@@ -385,7 +385,7 @@
             }
             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token !== null) {
                 tokenToUse = __initial_auth_token;
-                console.log("Initial Auth Token loaded from __initial_auth_token global.");
+                console.log("Initial Auth Token loaded from __initial_auth_token global:", tokenToUse ? "present" : "absent");
             }
 
             // 2. If Canvas globals are not available, fetch from backend API (for local dev/fallback)
@@ -425,29 +425,12 @@
                 }
             }
 
-            // Handle initial authentication (only for login.html and home.html where it's relevant)
-            if (window.location.pathname.includes('home.html') || window.location.pathname.includes('login.html')) {
-                if (tokenToUse) {
-                    try {
-                        await signInWithCustomToken(firebaseAuth, tokenToUse);
-                        console.log("Signed in with custom token.");
-                    } catch (e) {
-                        console.warn("Custom token sign-in failed, attempting anonymous sign-in or redirect:", e);
-                        await signInAnonymously(firebaseAuth); // Fallback
-                    }
-                } else {
-                    await signInAnonymously(firebaseAuth); // Sign in anonymously if no custom token
-                    console.log("Signed in anonymously.");
-                }
-            }
-
-
             // Set up the Auth State Changed listener (crucial for all pages)
             onAuthStateChanged(firebaseAuth, (user) => {
                 console.log("Auth state changed, user:", user ? user.uid : "null");
                 if (user) {
                     currentUser = user; // Set current user globally
-                    // For register.html, if user becomes authenticated, always redirect to home
+                    // For register.html, if user is authenticated, always redirect to home
                     window.location.href = 'home.html';
                 } else {
                     currentUser = null; // Clear current user
