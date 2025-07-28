@@ -1,5 +1,3 @@
-# backend/auth_service.py
-
 from firebase_admin import auth, firestore
 from .firebase_config import UNIQUE_USERNAMES_COLLECTION, USER_PROFILES_COLLECTION, APP_ID, db, FEEDBACK_COLLECTION
 import random
@@ -9,52 +7,8 @@ import os
 import json
 from typing import Union, List
 
-# Import SendGrid specific libraries (kept in case you use _send_email for other purposes)
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
-
-
-# --- Generic Email Sending Function (using SendGrid) ---
-# This function is kept for completeness but is not used in the current flow
-def _send_email(from_email: str, to_emails: Union[str, List[str]], subject: str, html_content: str) -> bool:
-    """
-    Sends a generic email using SendGrid.
-    to_emails can be a single email string or a list of email strings.
-    """
-    from_email = os.getenv("SENDGRID_SENDER_EMAIL", 'your_verified_sender_email@yourdomain.com') # Get from env or use placeholder
-
-    if not from_email or from_email == 'your_verified_sender_email@yourdomain.com':
-        print("ERROR: Please update 'SENDGRID_SENDER_EMAIL' environment variable with your verified SendGrid sender.")
-        return False
-
-    # Ensure to_emails is a list for the Mail constructor
-    if isinstance(to_emails, str):
-        to_emails = [to_emails]
-
-    message = Mail(
-        from_email=from_email,
-        to_emails=to_emails,
-        subject=subject,
-        html_content=html_content
-    )
-
-    try:
-        sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
-        if not sendgrid_api_key:
-            print("ERROR: SENDGRID_API_KEY environment variable not set. Please set it.")
-            return False
-
-        sg = SendGridAPIClient(sendgrid_api_key)
-        response = sg.send(message)
-        print(f"Email sent via SendGrid. Status Code: {response.status_code}")
-        if response.status_code == 200 or response.status_code == 202:
-            return True
-        else:
-            print(f"SendGrid API Error: {response.status_code} - {response.body.decode('utf-8')}")
-            return False
-    except Exception as e:
-        print(f"Error sending email with SendGrid: {e}")
-        return False
+# Removed SendGrid specific imports as email service is not desired.
+# Removed all email verification related functions as per user request.
 
 
 # --- Backend Functions ---
@@ -98,7 +52,7 @@ def register_user_backend(name: str, username: str, email: str, password: str) -
             email=email,
             password=password,
             display_name=name,
-            email_verified=False # Still set to False, but not enforced
+            email_verified=False # Explicitly set to False as no email verification is handled by backend
         )
         user_id = user.uid
         print(f"Firebase Auth user created: {user_id}")
@@ -165,6 +119,8 @@ def login_user_backend(identifier: str, password: str) -> dict:
     except Exception as e:
         print(f"Backend Error during user login: {e}")
         return {"success": False, "message": f"Login failed: {e}"}
+
+# --- Removed: send_firebase_email_verification_backend function as per user request ---
 
 # --- New Function: Delete User Data ---
 def delete_user_data_backend(uid: str) -> dict:
@@ -365,4 +321,3 @@ def save_feedback_backend(uid: str, feedback_message: str) -> dict:
     except Exception as e:
         print(f"Error saving feedback to Firestore: {e}")
         return {"success": False, "message": f"Failed to save feedback: {str(e)}"}
-
