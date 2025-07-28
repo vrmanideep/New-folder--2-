@@ -59,7 +59,7 @@
             width: 100%;
             padding: 0.85rem 1rem; /* Slightly more padding */
             border: 1px solid #ddd;
-            border-radius: 0.75rem; /* Rounded input fields */
+            border-radius: 0.75rem;
             font-size: 1rem;
             color: #333;
             outline: none;
@@ -296,18 +296,13 @@
     async function fetchFirebaseClientConfigAndInit() {
         console.log("fetchFirebaseClientConfigAndInit called.");
         let configToUse = null;
-        let tokenToUse = null;
 
         try {
-            // 1. Try to get config and token from Canvas global variables
-            console.log("Checking for __firebase_config and __initial_auth_token globals...");
+            // 1. Try to get config from Canvas global variables
+            console.log("Checking for __firebase_config global...");
             if (typeof __firebase_config !== 'undefined' && __firebase_config !== null) {
                 configToUse = JSON.parse(__firebase_config);
                 console.log("Firebase Config loaded from __firebase_config global.");
-            }
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token !== null) {
-                tokenToUse = __initial_auth_token;
-                console.log("Initial Auth Token loaded from __initial_auth_token global:", tokenToUse ? "present" : "absent");
             }
 
             // 2. If Canvas globals are not available, fetch from backend API (for local dev/fallback)
