@@ -6,7 +6,6 @@ from functools import wraps
 from firebase_admin import auth, storage, exceptions
 
 # Relative import for auth_service.py
-# This import itself can cause issues if backend is not treated as a package
 from .auth_service import (
     check_username_uniqueness_backend,
     register_user_backend,
@@ -16,7 +15,8 @@ from .auth_service import (
     get_user_profile_backend,
     update_user_address_backend,
     handle_google_auth_backend,
-    send_firebase_email_verification_backend
+    send_firebase_email_verification_backend,
+    save_feedback_backend # NEW: Import the feedback saving function
 )
 
 # Relative import for firebase_config.py
@@ -209,6 +209,19 @@ def upload_profile_picture(decoded_token):
             return jsonify({"success": False, "message": "An unexpected error occurred during upload."}), 500
     
     return jsonify({"success": False, "message": "File upload failed."}), 500
+
+@app.route('/api/send-feedback', methods=['POST']) # NEW: Feedback API endpoint
+@token_required
+def api_send_feedback(decoded_token):
+    uid = decoded_token['uid']
+    data = request.get_json()
+    feedback_message = data.get('message')
+
+    if not feedback_message:
+        return jsonify({"success": False, "message": "Feedback message cannot be empty."}), 400
+
+    result = save_feedback_backend(uid, feedback_message)
+    return jsonify(result)
 
 
 # --- Serve Static Frontend Files ---
