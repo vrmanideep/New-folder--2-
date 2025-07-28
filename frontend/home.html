@@ -863,7 +863,6 @@
             }
 
             // Handle initial authentication (only for login.html and home.html where it's relevant)
-            // This logic should be adapted per page if specific sign-in methods are required on load
             if (window.location.pathname.includes('home.html') || window.location.pathname.includes('login.html')) {
                 if (tokenToUse) {
                     try {
@@ -886,23 +885,16 @@
                 if (user) {
                     currentUser = user; // Set current user globally
                     // Page-specific UI updates and redirections
+                    // For home.html, just update UI, no email verification check needed here
                     if (window.location.pathname.includes('home.html')) {
                         updateUserUI(currentUser);
                         updateWelcomeMessage(currentUser);
                     } else if (window.location.pathname.includes('login.html') || window.location.pathname.includes('register.html')) {
-                        if (user.emailVerified) {
-                            window.location.href = 'home.html';
-                        } else {
-                            showMessageBox('Please verify your email to continue.', 'warning');
-                            window.location.href = `email_verification.html?email=${encodeURIComponent(user.email)}`;
-                        }
+                        // For login/register, if user is authenticated, always redirect to home
+                        window.location.href = 'home.html';
                     } else if (window.location.pathname.includes('email_verification.html')) {
-                        // On email_verification page, if user becomes verified, redirect to login
-                        if (user.emailVerified) {
-                            showMessageBox('Your email is verified. Redirecting to login.', 'success');
-                            setTimeout(() => { window.location.href = 'login.html'; }, 1500);
-                        }
-                        // Otherwise, the page's existing logic for resending/checking will apply
+                        // If user somehow lands on email_verification while authenticated, redirect to home
+                        window.location.href = 'home.html';
                     }
                 } else {
                     currentUser = null; // Clear current user
@@ -915,7 +907,15 @@
                 }
             });
 
+        } catch (error) {
+            console.error("Critical error during Firebase initialization or auth:", error);
+            showMessageBox("Critical error: Could not initialize application. Please try again.", "error");
+            // Fallback to login page if anything goes wrong
+            if (window.location.pathname !== '/login.html') {
+                window.location.href = 'login.html';
+            }
         }
+    }
 
     async function updateUserUI(user) {
         console.log("Updating UI for user:", user);
@@ -1208,16 +1208,10 @@
         const confirmNewPassword = confirmNewPasswordInput.value;
 
         changePasswordMessage.textContent = ''; // Clear previous messages
-        changePasswordMessage.className = 'status-message';
+        changePasswordMessage.className = 'status-message'; // Reset class
 
         if (!currentPassword || !newPassword || !confirmNewPassword) {
             changePasswordMessage.textContent = 'All fields are required.';
-            changePasswordMessage.classList.add('error');
-            return;
-        }
-
-        if (newPassword !== confirmNewPassword) {
-            changePasswordMessage.textContent = 'New password and confirmation do not match.';
             changePasswordMessage.classList.add('error');
             return;
         }
@@ -1228,6 +1222,12 @@
             return;
         }
         
+        if (newPassword !== confirmNewPassword) {
+            changePasswordMessage.textContent = 'New password and confirmation do not match.';
+            changePasswordMessage.classList.add('error');
+            return;
+        }
+
         changePasswordMessage.textContent = 'Changing password...';
         changePasswordMessage.classList.add('info');
         submitChangePasswordButton.disabled = true;
@@ -1483,6 +1483,7 @@
     });
 
 </script>
+
 
 </body>
 </html>
