@@ -624,7 +624,7 @@
             <h3>Confirm Account Deletion</h3>
             <p>Are you sure you want to delete your account? This action cannot be undone.</p>
             <div class="modal-buttons">
-                <button id="confirm-delete-button" class="modal-button confirm">Yes, Delete My Account</button>
+                <button id="confirm-delete-button" class="modal-button confirm" disabled>Yes, Delete My Account</button>
                 <button id="cancel-delete-button" class="modal-button cancel">Cancel</button>
             </div>
             <p id="delete-modal-message" class="status-message"></p>
@@ -827,6 +827,7 @@
 
         try {
             // 1. Try to get config and token from Canvas global variables
+            console.log("Checking for __firebase_config and __initial_auth_token globals...");
             if (typeof __firebase_config !== 'undefined' && __firebase_config !== null) {
                 configToUse = JSON.parse(__firebase_config);
                 console.log("Firebase Config loaded from __firebase_config global.");
@@ -863,17 +864,31 @@
                 firebaseAuth = getAuth(firebaseApp);
                 console.log("Firebase client app initialized.");
                 isFirebaseReady = true; // Set flag to true after successful initialization
+                console.log("isFirebaseReady set to:", isFirebaseReady);
+
                 // Enable buttons after Firebase is ready
-                // Assuming relevant buttons exist and are disabled initially
+                console.log("Attempting to enable home page buttons...");
                 const uploadPictureButton = document.getElementById('upload-picture-button');
                 const submitFeedbackButton = document.getElementById('submit-feedback-button');
-                const submitChangePasswordButton = document.getElementById('submit-change-password-button'); // For change password modal
-                const confirmDeleteButton = document.getElementById('confirm-delete-button'); // For delete account modal
+                const submitChangePasswordButton = document.getElementById('submit-change-password-button');
+                const confirmDeleteButton = document.getElementById('confirm-delete-button');
 
-                if (uploadPictureButton) uploadPictureButton.disabled = false;
-                if (submitFeedbackButton) submitFeedbackButton.disabled = false;
-                if (submitChangePasswordButton) submitChangePasswordButton.disabled = false;
-                if (confirmDeleteButton) confirmDeleteButton.disabled = false;
+                if (uploadPictureButton) {
+                    uploadPictureButton.disabled = false;
+                    console.log("Upload Picture button enabled.");
+                }
+                if (submitFeedbackButton) {
+                    submitFeedbackButton.disabled = false;
+                    console.log("Submit Feedback button enabled.");
+                }
+                if (submitChangePasswordButton) {
+                    submitChangePasswordButton.disabled = false;
+                    console.log("Change Password button enabled.");
+                }
+                if (confirmDeleteButton) {
+                    confirmDeleteButton.disabled = false;
+                    console.log("Confirm Delete button enabled.");
+                }
             }
 
             // Handle initial authentication (only for login.html and home.html where it's relevant)
@@ -925,6 +940,7 @@
             firebaseApp = null;
             firebaseAuth = null;
             isFirebaseReady = false; // Set flag to false on error
+            console.log("isFirebaseReady set to (on error):", isFirebaseReady);
             // Fallback to login page if anything goes wrong
             if (window.location.pathname !== '/login.html') {
                 window.location.href = 'login.html';
@@ -1543,7 +1559,6 @@
             // Default to dark if system preference is dark and no saved theme
             applyTheme('dark');
         } else {
-            // Default to light if no saved theme and system preference is not dark
             applyTheme('light');
         }
     });
