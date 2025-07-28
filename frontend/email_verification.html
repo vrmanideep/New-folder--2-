@@ -252,30 +252,8 @@
                 console.log("Auth state changed, user:", user ? user.uid : "null");
                 if (user) {
                     currentUser = user; // Set current user globally
-                    // Page-specific UI updates and redirections
-                    if (window.location.pathname.includes('home.html')) {
-                        // This block won't be hit on email_verification.html, but kept for general script
-                        // updateUserUI(currentUser);
-                        // updateWelcomeMessage(currentUser);
-                    } else if (window.location.pathname.includes('login.html') || window.location.pathname.includes('register.html')) {
-                        if (user.emailVerified) {
-                            window.location.href = 'home.html';
-                        } else {
-                            showMessageBox('Please verify your email to continue.', 'warning');
-                            window.location.href = `email_verification.html?email=${encodeURIComponent(user.email)}`;
-                        }
-                    } else if (window.location.pathname.includes('email_verification.html')) {
-                        // On email_verification page, if user becomes verified, redirect to login
-                        if (user.emailVerified) {
-                            showMessageBox('Your email is verified. Redirecting to login.', 'success');
-                            setTimeout(() => { window.location.href = 'login.html'; }, 1500);
-                        } else {
-                            // If user is logged in but email not verified, stay on this page
-                            emailDisplay.textContent = currentUser.email || 'your email';
-                            verificationMessage.textContent = 'A verification email has been sent to your inbox. Please check your spam folder.';
-                            verificationMessage.classList.add('info');
-                        }
-                    }
+                    // If user is authenticated, always redirect away from email_verification.html
+                    window.location.href = 'home.html';
                 } else {
                     currentUser = null; // Clear current user
                     // If user logs out or session expires, redirect to login
@@ -296,14 +274,18 @@
         }
     }
 
+    // The following functions (resendEmailButton, checkVerificationButton)
+    // are now technically redundant for the main flow if email verification is skipped.
+    // They are kept here for completeness in case you re-enable email verification
+    // or want to repurpose them. The page itself will redirect if a user is authenticated.
+
     resendEmailButton.addEventListener('click', async () => {
-        if (currentUser && !currentUser.emailVerified) {
-            verificationMessage.textContent = 'Sending new verification email...';
+        if (currentUser) {
+            verificationMessage.textContent = 'Sending new verification email... (This feature is currently not enforced)';
             verificationMessage.className = 'status-message info';
             resendEmailButton.disabled = true;
 
             try {
-                // Use backend API to resend verification email for better control/logging
                 const idToken = await currentUser.getIdToken();
                 const response = await fetch('/api/resend-verification-email', {
                     method: 'POST',
@@ -315,7 +297,7 @@
                 const result = await response.json();
 
                 if (response.ok && result.success) {
-                    verificationMessage.textContent = 'New verification email sent! Check your inbox.';
+                    verificationMessage.textContent = 'New verification email sent! (Note: Verification is not enforced)';
                     verificationMessage.classList.add('success');
                 } else {
                     verificationMessage.textContent = result.message || 'Failed to send verification email.';
@@ -328,31 +310,26 @@
             } finally {
                 resendEmailButton.disabled = false;
             }
-        } else if (currentUser && currentUser.emailVerified) {
-            verificationMessage.textContent = 'Your email is already verified. Redirecting to login...';
-            verificationMessage.classList.add('success');
-            setTimeout(() => { window.location.href = 'login.html'; }, 1500);
         } else {
-            verificationMessage.textContent = 'No user logged in or email not found.';
+            verificationMessage.textContent = 'No user logged in.';
             verificationMessage.classList.add('error');
         }
     });
 
     checkVerificationButton.addEventListener('click', async () => {
         if (currentUser) {
-            verificationMessage.textContent = 'Checking verification status...';
+            verificationMessage.textContent = 'Checking verification status... (Note: Verification is not enforced)';
             verificationMessage.className = 'status-message info';
             checkVerificationButton.disabled = true;
 
             try {
-                // Reload user to get the latest emailVerified status
-                await currentUser.reload();
+                await currentUser.reload(); // Still good practice to reload user data
                 if (currentUser.emailVerified) {
-                    verificationMessage.textContent = 'Your email is now verified! Redirecting to login...';
+                    verificationMessage.textContent = 'Your email is verified! Redirecting to home...';
                     verificationMessage.classList.add('success');
-                    setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+                    setTimeout(() => { window.location.href = 'home.html'; }, 1500);
                 } else {
-                    verificationMessage.textContent = 'Email is still not verified. Please check your inbox or resend.';
+                    verificationMessage.textContent = 'Email is not verified. (Note: Verification is not enforced)';
                     verificationMessage.classList.add('warning');
                 }
             } catch (error) {
@@ -414,6 +391,7 @@
         }
     });
 </script>
+
 
 </body>
 </html>
