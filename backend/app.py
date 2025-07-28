@@ -1,5 +1,3 @@
-# backend/app.py
-
 import os
 from flask import Flask, request, jsonify, send_from_directory, render_template
 from functools import wraps
@@ -15,8 +13,8 @@ from .auth_service import (
     get_user_profile_backend,
     update_user_address_backend,
     handle_google_auth_backend,
-    send_firebase_email_verification_backend,
-    save_feedback_backend # NEW: Import the feedback saving function
+    # Removed send_firebase_email_verification_backend as per user request
+    save_feedback_backend
 )
 
 # Relative import for firebase_config.py
@@ -99,12 +97,13 @@ def api_register():
     result = register_user_backend(name, username, email, password)
     return jsonify(result)
 
-@app.route('/api/resend-verification-email', methods=['POST'])
-@token_required
-def api_resend_verification_email(decoded_token):
-    user_id = decoded_token['uid']
-    result = send_firebase_email_verification_backend(user_id)
-    return jsonify(result)
+# Removed /api/resend-verification-email endpoint as per user request
+# @app.route('/api/resend-verification-email', methods=['POST'])
+# @token_required
+# def api_resend_verification_email(decoded_token):
+#     user_id = decoded_token['uid']
+#     result = send_firebase_email_verification_backend(user_id)
+#     return jsonify(result)
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -210,7 +209,7 @@ def upload_profile_picture(decoded_token):
     
     return jsonify({"success": False, "message": "File upload failed."}), 500
 
-@app.route('/api/send-feedback', methods=['POST']) # NEW: Feedback API endpoint
+@app.route('/api/send-feedback', methods=['POST'])
 @token_required
 def api_send_feedback(decoded_token):
     uid = decoded_token['uid']
