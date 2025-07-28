@@ -281,305 +281,302 @@
         </p>
     </div>
 
-    <script type="module">
-        // Import Firebase SDK modules
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+<script type="module">
+    // Import Firebase SDK modules
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signInWithCustomToken, sendEmailVerification, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-        // Placeholder for Firebase client configuration (will be fetched from backend)
-        let firebaseClientConfig = {};
-        let firebaseAuthInstance; // Store the auth instance
+    const registerForm = document.getElementById('register-form');
+    const nameInput = document.getElementById('name');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const confirmPasswordInput = document.getElementById('confirm-password');
+    const registerMessage = document.getElementById('register-message');
+    const usernameStatus = document.getElementById('username-status');
 
-        // Custom message box function (replaces alert)
-        function showMessageBox(message, type = 'info') {
-            const messageBox = document.createElement('div');
-            messageBox.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white z-[3000]`;
-            
-            let bgColor = '';
-            if (type === 'success') {
-                bgColor = 'bg-green-500';
-            } else if (type === 'error') {
-                bgColor = 'bg-red-500';
-            } else {
-                bgColor = 'bg-blue-500';
-            }
-            messageBox.classList.add(bgColor);
-            
-            messageBox.textContent = message;
-            document.body.appendChild(messageBox);
+    let firebaseApp;
+    let firebaseAuth;
+    let currentUser; // Stores the current authenticated Firebase user object
 
-            setTimeout(() => {
-                messageBox.remove();
-            }, 3000); // Message disappears after 3 seconds
+    // Custom message box function (replaces alert)
+    function showMessageBox(message, type = 'info') {
+        const messageBox = document.createElement('div');
+        messageBox.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white z-[3000]`;
+        
+        let bgColor = '';
+        if (type === 'success') {
+            bgColor = 'bg-green-500';
+        } else if (type === 'error') {
+            bgColor = 'bg-red-500';
+        } else {
+            bgColor = 'bg-blue-500';
         }
+        messageBox.classList.add(bgColor);
+        
+        messageBox.textContent = message;
+        document.body.appendChild(messageBox);
 
-        // Function to fetch client config from backend
-        async function fetchFirebaseClientConfig() {
-            try {
+        setTimeout(() => {
+            messageBox.remove();
+        }, 3000); // Message disappears after 3 seconds
+    }
+
+    // Function to fetch client config from backend and initialize Firebase
+    async function fetchFirebaseClientConfigAndInit() {
+        console.log("fetchFirebaseClientConfigAndInit called.");
+        let configToUse = null;
+        let tokenToUse = null;
+
+        try {
+            // 1. Try to get config and token from Canvas global variables
+            if (typeof __firebase_config !== 'undefined' && __firebase_config !== null) {
+                configToUse = JSON.parse(__firebase_config);
+                console.log("Firebase Config loaded from __firebase_config global.");
+            }
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token !== null) {
+                tokenToUse = __initial_auth_token;
+                console.log("Initial Auth Token loaded from __initial_auth_token global.");
+            }
+
+            // 2. If Canvas globals are not available, fetch from backend API (for local dev/fallback)
+            if (!configToUse) {
+                console.warn("Canvas global __firebase_config not found. Attempting to fetch from /api/firebase-config.");
                 const response = await fetch('/api/firebase-config');
-                const config = await response.json();
-                if (config.success && config.config) {
-                    firebaseClientConfig = config.config;
-                    // Initialize Firebase App ONLY after config is fetched
-                    const app = initializeApp(firebaseClientConfig);
-                    firebaseAuthInstance = getAuth(app); // Assign to global variable
-                    console.log("Firebase client app initialized.");
-
-                    // Listen for auth state changes (important for home.html)
-                    onAuthStateChanged(firebaseAuthInstance, (user) => {
-                        if (user) {
-                            console.log("Firebase Auth State Changed: User is logged in.", user.uid);
-                            // If user is already logged in, redirect to home.html
-                            if (window.location.pathname.includes('register.html') && user.emailVerified) {
-                                window.location.href = 'home.html';
-                            }
-                        } else {
-                            console.log("Firebase Auth State Changed: User is logged out.");
-                            // If user is on a protected page and logs out, redirect to login
-                            if (window.location.pathname.includes('home.html')) {
-                                window.location.href = 'login.html';
-                            }
-                        }
-                    });
-
+                const configResult = await response.json();
+                if (configResult.success && configResult.config) {
+                    configToUse = configResult.config;
+                    console.log("Firebase client config fetched from /api/firebase-config.");
                 } else {
-                    console.error("Failed to fetch Firebase client config:", config.message);
+                    console.error("Failed to fetch Firebase client config from backend:", configResult.message);
                     showMessageBox("Error: Could not initialize Firebase. Please try again.", "error");
+                    return; // Stop execution if config is not available
                 }
-            } catch (error) {
-                console.error("Network error fetching Firebase client config:", error);
-                showMessageBox("Network error: Could not initialize Firebase.", "error");
+            }
+
+            // Initialize Firebase App
+            if (!firebaseApp) { // Only initialize if not already initialized
+                firebaseApp = initializeApp(configToUse);
+                firebaseAuth = getAuth(firebaseApp);
+                console.log("Firebase client app initialized.");
+            }
+
+            // Handle initial authentication (only for login.html and home.html where it's relevant)
+            if (window.location.pathname.includes('home.html') || window.location.pathname.includes('login.html')) {
+                if (tokenToUse) {
+                    try {
+                        await signInWithCustomToken(firebaseAuth, tokenToUse);
+                        console.log("Signed in with custom token.");
+                    } catch (e) {
+                        console.warn("Custom token sign-in failed, attempting anonymous sign-in or redirect:", e);
+                        await signInAnonymously(firebaseAuth); // Fallback
+                    }
+                } else {
+                    await signInAnonymously(firebaseAuth); // Sign in anonymously if no custom token
+                    console.log("Signed in anonymously.");
+                }
+            }
+
+
+            // Set up the Auth State Changed listener (crucial for all pages)
+            onAuthStateChanged(firebaseAuth, (user) => {
+                console.log("Auth state changed, user:", user ? user.uid : "null");
+                if (user) {
+                    currentUser = user; // Set current user globally
+                    // Page-specific UI updates and redirections
+                    if (window.location.pathname.includes('home.html')) {
+                        // This block won't be hit on register.html, but kept for general script
+                        // updateUserUI(currentUser);
+                        // updateWelcomeMessage(currentUser);
+                    } else if (window.location.pathname.includes('login.html') || window.location.pathname.includes('register.html')) {
+                        if (user.emailVerified) {
+                            window.location.href = 'home.html';
+                        } else {
+                            showMessageBox('Please verify your email to continue.', 'warning');
+                            window.location.href = `email_verification.html?email=${encodeURIComponent(user.email)}`;
+                        }
+                    } else if (window.location.pathname.includes('email_verification.html')) {
+                        if (user.emailVerified) {
+                            showMessageBox('Your email is verified. Redirecting to login.', 'success');
+                            setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+                        }
+                    }
+                } else {
+                    currentUser = null; // Clear current user
+                    // On login/register pages, if user logs out, they stay on the page.
+                    // For other pages, if user logs out, redirect to login.
+                    if (!window.location.pathname.includes('login.html') && !window.location.pathname.includes('register.html')) {
+                        console.log("User logged out or session expired. Redirecting to login.");
+                        window.location.href = 'login.html';
+                    }
+                }
+            });
+
+        } catch (error) {
+            console.error("Critical error during Firebase initialization or auth:", error);
+            showMessageBox("Critical error: Could not initialize application. Please try again.", "error");
+            // Fallback to login page if anything goes wrong
+            if (window.location.pathname !== '/login.html') {
+                window.location.href = 'login.html';
             }
         }
+    }
 
-        // Fetch config and initialize Firebase on page load
-        fetchFirebaseClientConfig();
+    usernameInput.addEventListener('input', debounce(checkUsername, 500));
 
+    async function checkUsername() {
+        const username = usernameInput.value.trim();
+        if (username.length < 3) {
+            usernameStatus.textContent = 'Username must be at least 3 characters.';
+            usernameStatus.className = 'text-red-500 text-sm mt-1';
+            return;
+        }
 
-        const registerForm = document.getElementById('register-form');
-        const nameInput = document.getElementById('name');
-        const usernameInput = document.getElementById('username');
-        const emailInput = document.getElementById('email');
-        const passwordInput = document.getElementById('password');
-        const confirmPasswordInput = document.getElementById('confirm-password');
-        const registerButton = registerForm.querySelector('.register-button');
-        const registerMessage = document.getElementById('register-message');
-        const usernameStatus = document.getElementById('username-status');
-        const passwordStrengthIndicator = document.getElementById('password-strength-indicator');
-        const passwordStrengthText = document.getElementById('password-strength-text');
-        const googleSignInButton = document.getElementById('google-signin-button');
+        usernameStatus.textContent = 'Checking availability...';
+        usernameStatus.className = 'text-gray-500 text-sm mt-1';
 
-        let usernameCheckTimeout;
-        const doneTypingInterval = 800; // milliseconds
-        let isUsernameAvailable = false;
+        try {
+            const response = await fetch(`/api/check-username?username=${encodeURIComponent(username)}`);
+            const data = await response.json();
 
-        // --- Username Availability Check ---
-        usernameInput.addEventListener('keyup', () => {
-            clearTimeout(usernameCheckTimeout);
-            const username = usernameInput.value.trim();
-            if (username.length >= 3) {
-                usernameStatus.textContent = 'Checking...';
-                usernameStatus.className = 'username-status checking';
-                usernameCheckTimeout = setTimeout(async () => {
-                    try {
-                        const response = await fetch(`/api/check-username?username=${username}`);
-                        const result = await response.json();
-                        if (result.available) {
-                            usernameStatus.textContent = result.message;
-                            usernameStatus.className = 'username-status available';
-                            isUsernameAvailable = true;
-                        } else {
-                            usernameStatus.textContent = result.message;
-                            usernameStatus.className = 'username-status taken';
-                            isUsernameAvailable = false;
-                        }
-                    } catch (error) {
-                        console.error('Error checking username:', error);
-                        usernameStatus.textContent = 'Error checking username.';
-                        usernameStatus.className = 'username-status error';
-                        isUsernameAvailable = false;
-                    }
-                }, 500); // Debounce for 500ms
+            if (data.available) {
+                usernameStatus.textContent = data.message;
+                usernameStatus.className = 'text-green-500 text-sm mt-1';
             } else {
-                usernameStatus.textContent = '';
-                usernameStatus.className = 'username-status';
-                isUsernameAvailable = false;
+                usernameStatus.textContent = data.message;
+                usernameStatus.className = 'text-red-500 text-sm mt-1';
             }
-        });
+        } catch (error) {
+            console.error('Error checking username:', error);
+            usernameStatus.textContent = 'Error checking username. Please try again.';
+            usernameStatus.className = 'text-red-500 text-sm mt-1';
+        }
+    }
 
-        // --- Password Strength Check ---
-        passwordInput.addEventListener('input', () => {
-            const password = passwordInput.value;
-            let strength = 0;
-            let text = 'Weak';
-            let className = 'strength-weak';
+    function debounce(func, delay) {
+        let timeout;
+        return function(...args) {
+            const context = this;
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(context, args), delay);
+        };
+    }
 
-            if (password.length > 7) strength++;
-            if (password.match(/[a-z]/) && password.match(/[A-Z]/)) strength++;
-            if (password.match(/\d/)) strength++;
-            if (password.match(/[^a-zA-Z0-9]/)) strength++;
+    registerForm.addEventListener('submit', async (event) => {
+        event.preventDefault(); // Prevent default form submission
 
-            if (strength === 0) {
-                text = '';
-                className = '';
-                passwordStrengthIndicator.style.width = '0%';
-            } else if (strength <= 2) {
-                text = 'Weak';
-                className = 'strength-weak';
-            } else if (strength === 3) {
-                text = 'Medium';
-                className = 'strength-medium';
-            } else {
-                text = 'Strong';
-                className = 'strength-strong';
-            }
+        const name = nameInput.value.trim();
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value.trim();
+        const confirmPassword = confirmPasswordInput.value.trim();
 
-            passwordStrengthIndicator.className = 'password-strength-indicator ' + className;
-            passwordStrengthText.textContent = text;
-            passwordStrengthText.style.color = (strength === 0) ? '' : (strength <= 2 ? '#dc3545' : (strength === 3 ? '#ffc107' : '#28a745'));
-        });
+        registerMessage.textContent = ''; // Clear previous messages
+        registerMessage.className = 'status-message'; // Reset class
 
-        // --- Email/Password Registration Form Submission ---
-        registerForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
+        if (!name || !username || !password || !confirmPassword) {
+            registerMessage.textContent = 'All fields are required.';
+            registerMessage.classList.add('error');
+            return;
+        }
 
-            const name = nameInput.value.trim();
-            const username = usernameInput.value.trim();
-            const email = emailInput.value.trim();
-            const password = passwordInput.value.trim();
-            const confirmPassword = confirmPasswordInput.value.trim();
+        if (password.length < 6) {
+            registerMessage.textContent = 'Password must be at least 6 characters long.';
+            registerMessage.classList.add('error');
+            return;
+        }
 
-            registerMessage.textContent = '';
-            registerMessage.className = 'message';
+        if (password !== confirmPassword) {
+            registerMessage.textContent = 'Passwords do not match.';
+            registerMessage.classList.add('error');
+            return;
+        }
 
-            if (!name || !username || !email || !password || !confirmPassword) {
-                registerMessage.textContent = 'All fields are required.';
-                registerMessage.classList.add('error');
-                showMessageBox('All fields are required.', 'error');
-                return;
-            }
+        // Re-check username uniqueness before final submission to prevent race conditions
+        const usernameCheckResponse = await fetch(`/api/check-username?username=${encodeURIComponent(username)}`);
+        const usernameCheckData = await usernameCheckResponse.json();
+        if (!usernameCheckData.available) {
+            registerMessage.textContent = usernameCheckData.message;
+            registerMessage.classList.add('error');
+            return;
+        }
 
-            if (password !== confirmPassword) {
-                registerMessage.textContent = 'Passwords do not match.';
-                registerMessage.classList.add('error');
-                showMessageBox('Passwords do not match.', 'error');
-                return;
-            }
+        registerMessage.textContent = 'Registering...';
+        registerMessage.classList.add('info');
 
-            if (!isUsernameAvailable) {
-                registerMessage.textContent = 'Please choose an available username before registering.';
-                registerMessage.classList.add('error');
-                showMessageBox('Please choose an available username before registering.', 'error');
-                return;
-            }
+        try {
+            const response = await fetch('/api/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name, username, password })
+            });
 
-            registerMessage.textContent = 'Registering...';
-            registerMessage.classList.add('info');
-            registerButton.disabled = true;
-            googleSignInButton.disabled = true;
+            const result = await response.json();
 
-            try {
-                const response = await fetch('/api/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, username, email, password }),
-                });
-
-                const result = await response.json();
-
-                if (response.ok && result.success) {
-                    registerMessage.textContent = result.message;
-                    registerMessage.classList.add('success');
-                    showMessageBox(result.message, 'success');
-
-                    // Sign in the user with the custom token received from the backend
-                    if (result.custom_token && firebaseAuthInstance) {
-                        await signInWithCustomToken(firebaseAuthInstance, result.custom_token);
-                        console.log("Signed in with custom token after registration.");
-                    }
-
-                    // Redirect to email verification page, passing email as a query parameter
+            if (response.ok && result.success) {
+                registerMessage.textContent = result.message;
+                registerMessage.classList.add('success');
+                // Optionally, automatically sign in the user if a custom token is returned
+                if (result.custom_token) {
+                    await signInWithCustomToken(firebaseAuth, result.custom_token);
+                    // onAuthStateChanged listener will handle redirection
+                } else {
+                    // If no custom token, redirect to login or email verification
                     setTimeout(() => {
-                        window.location.href = `email_verification.html?email=${encodeURIComponent(email)}`;
-                    }, 1500);
-                } else {
-                    registerMessage.textContent = result.message || 'Registration failed. Please try again.';
-                    registerMessage.classList.add('error');
-                    showMessageBox(result.message || 'Registration failed. Please try again.', 'error');
+                        window.location.href = 'login.html';
+                    }, 2000);
                 }
-            } catch (error) {
-                console.error('Network error during registration:', error);
-                registerMessage.textContent = 'Network error. Please try again later.';
+            } else {
+                registerMessage.textContent = result.message || 'Registration failed.';
                 registerMessage.classList.add('error');
-                showMessageBox('Network error. Please try again later.', 'error');
-            } finally {
-                registerButton.disabled = false;
-                googleSignInButton.disabled = false;
             }
-        });
+        } catch (error) {
+            console.error('Registration error:', error);
+            registerMessage.textContent = 'Network error. Please try again.';
+            registerMessage.classList.add('error');
+        }
+    });
 
-        // --- Google Sign-Up ---
-        googleSignInButton.addEventListener('click', async () => {
-            registerMessage.textContent = 'Signing up with Google...';
-            registerMessage.className = 'message info';
-            registerButton.disabled = true;
-            googleSignInButton.disabled = true;
+    // Light/Dark Mode Toggle Logic
+    const themeToggleButton = document.getElementById('theme-toggle');
+    const themeIcon = document.getElementById('theme-icon');
 
-            try {
-                const provider = new GoogleAuthProvider();
-                const result = await signInWithPopup(firebaseAuthInstance, provider);
-                const user = result.user;
-                const idToken = await user.getIdToken();
+    function applyTheme(theme) {
+        if (theme === 'dark') {
+            document.body.classList.remove('light-mode');
+            themeIcon.textContent = '🌙'; // Moon icon for dark mode
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.body.classList.add('light-mode');
+            themeIcon.textContent = '☀️'; // Sun icon for light mode
+            localStorage.setItem('theme', 'light');
+        }
+    }
 
-                console.log("Google Sign-In successful on client. Sending ID token to backend.");
+    function toggleTheme() {
+        const currentTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        if (currentTheme === 'dark') {
+            applyTheme('light');
+        } else {
+            applyTheme('dark');
+        }
+    }
 
-                const backendResponse = await fetch('/api/google-auth', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${idToken}`
-                    },
-                    body: JSON.stringify({
-                        displayName: user.displayName,
-                        email: user.email,
-                        photoURL: user.photoURL
-                    })
-                });
+    themeToggleButton.addEventListener('click', toggleTheme);
 
-                const backendResult = await backendResponse.json();
+    // Apply theme on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchFirebaseClientConfigAndInit(); // Initialize Firebase first
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+            applyTheme(savedTheme);
+        } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            applyTheme('dark');
+        } else {
+            applyTheme('light');
+        }
+    });
+</script>
 
-                if (backendResponse.ok && backendResult.success) {
-                    registerMessage.textContent = backendResult.message;
-                    registerMessage.classList.add('success');
-                    showMessageBox(backendResult.message, 'success');
-                    // For Google Sign-Up, the email is usually already verified or handled differently.
-                    // Redirect directly to home.html or login.html
-                    window.location.href = 'home.html';
-                } else {
-                    registerMessage.textContent = backendResult.message || 'Google sign-up failed on server.';
-                    registerMessage.classList.add('error');
-                    showMessageBox(backendResult.message || 'Google sign-up failed on server.', 'error');
-                    await firebaseAuthInstance.signOut();
-                }
-
-            } catch (error) {
-                console.error('Google Sign-Up error:', error);
-                if (error.code === 'auth/popup-closed-by-user') {
-                    registerMessage.textContent = 'Google sign-up cancelled.';
-                    showMessageBox('Google sign-up cancelled.', 'info');
-                } else if (error.code) {
-                    registerMessage.textContent = `Google Sign-Up Error: ${error.message}`;
-                    showMessageBox(`Google Sign-Up Error: ${error.message}`, 'error');
-                } else {
-                    registerMessage.textContent = 'Network error during Google sign-up. Please try again.';
-                    showMessageBox('Network error during Google sign-up. Please try again.', 'error');
-                }
-                registerMessage.classList.add('error');
-            } finally {
-                registerButton.disabled = false;
-                googleSignInButton.disabled = false;
-            }
-        });
-    </script>
 </body>
 </html>
