@@ -1,36 +1,94 @@
 # backend/auth_service.py
 
-from firebase_admin import auth, firestore, exceptions
-import secrets
+from firebase_admin import auth, firestore
+from .firebase_config import UNIQUE_USERNAMES_COLLECTION, USER_PROFILES_COLLECTION, EMAIL_OTPS_COLLECTION, APP_ID, db, FEEDBACK_COLLECTION
+import random
 import string
 import time
+import os
+import json
+from typing import Union, List
 
-# Assuming firebase_config is initialized and contains db and APP_ID
-from . import firebase_config
-
-# Firestore references
-users_collection = firebase_config.db.collection(f'artifacts/{firebase_config.APP_ID}/public/data/users')
-user_profiles_collection = firebase_config.db.collection(f'artifacts/{firebase_config.APP_ID}/public/data/user_profiles')
-usernames_collection = firebase_config.db.collection(f'artifacts/{firebase_config.APP_ID}/public/data/usernames')
-feedback_collection = firebase_config.db.collection(f'artifacts/{firebase_config.APP_ID}/public/data/feedback') # NEW: Feedback collection
+# Import SendGrid specific libraries (kept, but not used for verification flow)
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 
-def generate_random_password(length=12):
-    """Generate a random password."""
-    characters = string.ascii_letters + string.digits + string.punctuation
-    password = ''.join(secrets.choice(characters) for i in range(length))
-    return password
-
-def check_username_uniqueness_backend(username):
+# --- Generic Email Sending Function (using SendGrid) ---
+def _send_email(from_email: str, to_emails: Union[str, List[str]], subject: str, html_content: str) -> bool:
     """
-    Checks if a username is already taken in Firestore.
+    Sends a generic email using SendGrid.
+    to_emails can be a single email string or a list of email strings.
     """
-    if not username:
-        return {"available": False, "message": "Username cannot be empty."}
+    from_email = os.getenv("SENDGRID_SENDER_EMAIL", 'your_verified_sender_email@yourdomain.com') # Get from env or use placeholder
+
+    if not from_email or from_email == 'your_verified_sender_email@yourdomain.com':
+        print("ERROR: Please update 'SENDGRID_SENDER_EMAIL' environment variable with your verified SendGrid sender.")
+        return False
+
+    # Ensure to_emails is a list for the Mail constructor
+    if isinstance(to_emails, str):
+        to_emails = [to_emails]
+
+    message = Mail(
+        from_email=from_email,
+        to_emails=to_emails,
+        subject=subject,
+        html_content=html_content
+    )
 
     try:
-        # Check if the username document exists
-        doc_ref = usernames_collection.document(username)
+        sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
+        if not sendgrid_api_key:
+            print("ERROR: SENDGRID_API_KEY environment variable not set. Please set it.")
+            return False
+
+        sg = SendGridAPIClient(sendgrid_api_key)
+        response = sg.send(message)
+        print(f"Email sent via SendGrid. Status Code: {response.status_code}")
+        if response.status_code == 200 or response.status_code == 202:
+            return True
+        else:
+            print(f"SendGrid API Error: {response.status_code} - {response.body.decode('utf-8')}")
+            return False
+    except Exception as e:
+        print(f"Error sending email with SendGrid: {e}")
+        return False
+
+
+# --- Real Email Sending Function (using _send_email helper) ---
+# This function is now mostly for internal use if you decide to send other emails
+def _send_email_with_otp(email: str) -> bool:
+    """
+    Sends an email with an OTP using the generic _send_email helper.
+    """
+    otp = ''.join(random.choices(string.digits, k=6))
+    expiry_time = int(time.time()) + 300 # OTP valid for 5 minutes
+
+    EMAIL_OTPS_COLLECTION.document(email.lower()).set({
+        'otp': otp,
+        'expiry': expiry_time,
+        'createdAt': firestore.SERVER_TIMESTAMP
+    })
+    print(f"OTP '{otp}' stored for {email}.")
+
+    subject = 'Your One-Time Password (OTP) for Verification'
+    html_content = f'<strong>Your One-Time Password (OTP) is: {otp}</strong>'
+    return _send_email(os.getenv("SENDGRID_SENDER_EMAIL"), email, subject, html_content)
+
+
+# --- Backend Functions ---
+
+def check_username_uniqueness_backend(username: str) -> dict:
+    """
+    Checks if a username is already taken in Firestore.
+    This function is called by the frontend's username validation.
+    """
+    if not username or len(username) < 3:
+        return {"available": False, "message": "Username must be at least 3 characters."}
+
+    try:
+        doc_ref = UNIQUE_USERNAMES_COLLECTION.document(username.lower())
         doc = doc_ref.get()
 
         if doc.exists:
@@ -38,334 +96,309 @@ def check_username_uniqueness_backend(username):
         else:
             return {"available": True, "message": "Username is available!"}
     except Exception as e:
-        print(f"Error checking username uniqueness: {e}")
-        return {"available": False, "message": "Error checking username."}
+        print(f"Backend Error checking username uniqueness: {e}")
+        return {"available": False, "message": "Server error during check."}
 
 
-def register_user_backend(name, username, email, password):
+def register_user_backend(name: str, username: str, email: str, password: str) -> dict:
     """
-    Registers a new user in Firebase Authentication and stores profile data in Firestore.
-    Sends email verification link upon successful creation.
+    Registers a new user in Firebase Authentication and stores profile in Firestore.
+    Email verification is now skipped.
     Returns a custom token for client-side sign-in.
     """
-    if not name or not username or not email or not password:
+    if not all([name, username, email, password]):
         return {"success": False, "message": "All fields are required."}
 
+    username_check = check_username_uniqueness_backend(username)
+    if not username_check["available"]:
+        return {"success": False, "message": username_check["message"]}
+
     try:
-        # 1. Create user in Firebase Authentication
         user = auth.create_user(
             email=email,
             password=password,
             display_name=name,
-            email_verified=False # Mark as not verified initially
+            email_verified=False # Still set to False, but not enforced
         )
-        print(f"Firebase Auth user created: {user.uid}")
+        user_id = user.uid
+        print(f"Firebase Auth user created: {user_id}")
 
-        # 2. Store username mapping to UID
-        username_doc_ref = usernames_collection.document(username)
-        username_doc_ref.set({
-            'uid': user.uid,
+        UNIQUE_USERNAMES_COLLECTION.document(username.lower()).set({
+            'uid': user_id,
             'email': email,
             'timestamp': firestore.SERVER_TIMESTAMP
         })
         print(f"Username '{username}' recorded as unique.")
 
-        # 3. Store user profile in Firestore
-        user_profile_doc_ref = user_profiles_collection.document(user.uid)
-        user_profile_doc_ref.set({
+        USER_PROFILES_COLLECTION.document(user_id).set({
             'name': name,
-            'username': username,
+            'username': username.lower(),
             'email': email,
-            'photoURL': user.photo_url, # Will be None initially for email/password
-            'emailVerified': False,
-            'createdAt': firestore.SERVER_TIMESTAMP
-        })
+            'photoURL': user.photo_url,
+            'createdAt': firestore.SERVER_TIMESTAMP,
+            'emailVerified': False, # Explicitly set to False as we are not enforcing it
+            'authProvider': 'password'
+        }, merge=True)
         print(f"User profile for '{username}' stored in Firestore.")
 
-        # 4. Generate a custom token for the client to sign in
-        custom_token = auth.create_custom_token(user.uid).decode('utf-8')
-        print(f"Custom token generated for user: {user.uid}")
+        # Generate a custom token for the client to sign in
+        custom_token = auth.create_custom_token(user_id).decode('utf-8')
+        print(f"Custom token generated for user: {user_id}")
 
-        # 5. Send email verification link (this will generate the link, client-side sends it)
-        send_firebase_email_verification_backend(user.uid)
-        print(f"Email verification link generation triggered for {email}")
+        # Removed: send_firebase_email_verification_backend(user.uid)
+        # Email verification is no longer enforced after registration.
 
+        return {"success": True, "message": "Registration successful! You can now log in.", "custom_token": custom_token}
 
-        return {"success": True, "message": "Registration successful! Please check your email for a verification link.", "custom_token": custom_token}
-
-    except exceptions.FirebaseError as e:
-        error_message = str(e)
-        if "EMAIL_EXISTS" in error_message:
-            return {"success": False, "message": "Email is already registered."}
-        elif "WEAK_PASSWORD" in error_message:
-            return {"success": False, "message": "Password is too weak."}
-        elif "The email address is already in use by another account." in error_message:
-            return {"success": False, "message": "Email is already in use."}
-        elif "The email address is not valid." in error_message:
-            return {"success": False, "message": "The email address is not valid."}
-        print(f"Firebase Auth error during registration: {e}")
-        return {"success": False, "message": f"Registration failed: {error_message}"}
+    except auth.EmailAlreadyExistsError:
+        return {"success": False, "message": "Email is already registered."}
     except Exception as e:
-        print(f"Unexpected error during registration: {e}")
-        return {"success": False, "message": "An unexpected error occurred during registration."}
+        print(f"Error during user registration: {e}")
+        return {"success": False, "message": f"Registration failed: {e}"}
 
 def send_firebase_email_verification_backend(uid):
     """
     Generates a Firebase email verification link for the user.
-    The actual email sending is typically handled by Firebase's configured email templates
-    when triggered by the client-side SDK's sendEmailVerification method.
-    This backend function primarily sets the action URL for the link.
+    This function is kept for completeness but is no longer called during registration.
     """
     try:
         user = auth.get_user(uid)
         if not user.email_verified:
-            # Generate the email action link
             action_code_settings = auth.ActionCodeSettings(
-                url='http://localhost:5000/email_verification.html', # Redirect to email_verification.html after verification
+                url='http://localhost:5000/email_verification.html',
                 handle_code_in_app=True,
-                # The Android and iOS packages are optional, but useful if you have a mobile app
-                # android_package_name='com.example.androidapp',
-                # ios_bundle_id='com.example.iosapp',
-                # dynamic_link_domain='example.page.link' # Optional: if using Firebase Dynamic Links
             )
             link = auth.generate_email_verification_link(user.email, action_code_settings)
             print(f"Firebase Email Verification Link generated for {user.email}: {link}")
-            # The actual email sending is expected to be triggered by the client-side Firebase SDK
-            # using `sendEmailVerification`. This backend function just ensures the link structure is correct.
             return {"success": True, "message": "Verification email link generated."}
         else:
             return {"success": True, "message": "Email is already verified."}
-    except exceptions.FirebaseError as e:
+    except Exception as e:
         print(f"Firebase error generating verification email link: {e}")
         return {"success": False, "message": f"Failed to generate verification email link: {str(e)}"}
-    except Exception as e:
-        print(f"Unexpected error generating verification email link: {e}")
-        return {"success": False, "message": "An unexpected error occurred."}
 
 
-def login_user_backend(identifier, password):
+def login_user_backend(identifier: str, password: str) -> dict:
     """
-    Logs in a user using email/password or username/password.
-    If using username, it first resolves the username to an email.
-    Returns a custom token for client-side sign-in.
+    Authenticates a user and generates a Firebase Custom Token for client-side sign-in.
     """
+    if not all([identifier, password]):
+        return {"success": False, "message": "Username/Email and password are required."}
+
     try:
         email = identifier
         # Check if the identifier is a username
         if "@" not in identifier:
-            username_doc = usernames_collection.document(identifier).get()
+            username_doc = UNIQUE_USERNAMES_COLLECTION.document(identifier.lower()).get()
             if username_doc.exists:
                 email = username_doc.to_dict().get('email')
             else:
-                return {"success": False, "message": "Invalid credentials."} # Changed message for clarity
+                return {"success": False, "message": "Invalid credentials."}
 
-        # Attempt to get user by email
         user = auth.get_user_by_email(email)
+        user_id = user.uid
+        print(f"User '{email}' found in Firebase Auth.")
 
-        # Firebase Admin SDK does not directly verify passwords.
-        # This backend function is primarily for generating a custom token for a known user.
-        # The actual password verification should happen on the client-side using Firebase Client SDK
-        # (e.g., signInWithEmailAndPassword) which then provides an ID token.
-        # For a backend-driven login, you'd need a more complex setup to verify password securely.
-        # For this demo, we'll assume the client handles password verification and then sends an ID token,
-        # or we generate a custom token directly if the user is found (less secure for password login).
-        # Let's generate a custom token for demonstration purposes, assuming password was verified client-side.
-        custom_token = auth.create_custom_token(user.uid).decode('utf-8')
-        return {"success": True, "message": "Login successful!", "token": custom_token}
+        custom_token = auth.create_custom_token(user_id).decode('utf-8')
+        print(f"Generated custom token for user: {user_id}")
 
-    except exceptions.FirebaseError as e:
-        error_message = str(e)
-        if "EMAIL_NOT_FOUND" in error_message or "user-not-found" in error_message:
-            return {"success": False, "message": "Email ID is not registered."} # Specific message for unregistered email
-        elif "INVALID_PASSWORD" in error_message or "wrong-password" in error_message:
-            return {"success": False, "message": "Invalid credentials."}
-        # Add more specific error handling if needed, e.g., for disabled users
-        print(f"Firebase Auth error during login: {e}")
-        return {"success": False, "message": f"Login failed: {error_message}"}
+        return {"success": True, "message": "Login successful.", "customToken": custom_token}
+
+    except auth.UserNotFoundError:
+        return {"success": False, "message": "Invalid username or password."}
     except Exception as e:
-        print(f"Unexpected error during login: {e}")
-        return {"success": False, "message": "An unexpected error occurred during login."}
+        print(f"Backend Error during user login: {e}")
+        return {"success": False, "message": f"Login failed: {e}"}
 
+# --- New Function: Delete User Data ---
+def delete_user_data_backend(uid: str) -> dict:
+    """
+    Deletes a user from Firebase Authentication, their unique username entry,
+    user profile, and any associated OTPs in Firestore.
+    """
+    if not uid:
+        return {"success": False, "message": "User ID is required for deletion."}
 
-def delete_user_data_backend(identifier):
-    """
-    Deletes user data from Firebase Authentication and Firestore.
-    Can delete by UID or email.
-    """
     try:
-        user_record = None
-        if "@" in identifier: # Assume it's an email
-            user_record = auth.get_user_by_email(identifier)
-        else: # Assume it's a UID or username (need to resolve username to UID)
-            # First, try to get by UID directly
-            try:
-                user_record = auth.get_user(identifier)
-            except exceptions.FirebaseError:
-                # If not a UID, check if it's a username
-                username_doc = usernames_collection.document(identifier).get()
-                if username_doc.exists:
-                    uid_from_username = username_doc.to_dict().get('uid')
-                    user_record = auth.get_user(uid_from_username)
-                else:
-                    return {"success": False, "message": "User not found."}
+        user = auth.get_user(uid) # Get user by UID directly
 
-        uid = user_record.uid
-
-        # Delete from Firebase Authentication
         auth.delete_user(uid)
-        print(f"Firebase Auth user deleted: {uid}")
+        print(f"User '{uid}' deleted from Firebase Authentication.")
 
-        # Delete user profile from Firestore
-        user_profile_doc_ref = user_profiles_collection.document(uid)
-        if user_profile_doc_ref.get().exists:
-            user_profile_doc_ref.delete()
-            print(f"User profile deleted from Firestore for UID: {uid}")
+        USER_PROFILES_COLLECTION.document(uid).delete()
+        print(f"User profile for '{uid}' deleted from Firestore.")
 
-        # Delete username mapping from Firestore
-        # Find the username associated with this UID to delete its document
-        username_query = usernames_collection.where('uid', '==', uid).limit(1).get()
+        # Find and delete username mapping
+        username_query = UNIQUE_USERNAMES_COLLECTION.where('uid', '==', uid).limit(1).get()
         for doc in username_query:
             doc.reference.delete()
-            print(f"Username mapping deleted from Firestore for UID: {uid}")
-            break # Should only be one
+            print(f"Unique username mapping for '{uid}' deleted from Firestore.")
+            break
 
-        return {"success": True, "message": "Account and associated data deleted successfully."}
+        # Delete associated OTP if exists (if email was used for OTP)
+        if user.email:
+            otp_doc_ref = EMAIL_OTPS_COLLECTION.document(user.email.lower())
+            if otp_doc_ref.get().exists:
+                otp_doc_ref.delete()
+                print(f"Associated OTP for '{user.email}' deleted from Firestore.")
 
-    except exceptions.FirebaseError as e:
-        print(f"Firebase error deleting user: {e}")
-        return {"success": False, "message": f"Failed to delete account: {str(e)}"}
+        return {"success": True, "message": f"User '{uid}' and all associated data deleted successfully."}
+
+    except auth.UserNotFoundError:
+        return {"success": False, "message": "User not found."}
     except Exception as e:
-        print(f"Unexpected error during account deletion: {e}")
-        return {"success": False, "message": "An unexpected error occurred during account deletion."}
+        print(f"Error deleting user data: {e}")
+        return {"success": False, "message": f"Failed to delete user data: {e}"}
 
+# --- Gemini API Integration Function (Removed as per user request) ---
+async def get_login_tips_backend() -> dict:
+    return {"success": False, "message": "Login tips feature is currently disabled."}
 
-async def get_login_tips_backend():
+# --- Get User Profile ---
+def get_user_profile_backend(user_id: str) -> dict:
     """
-    Fetches login tips from a dummy API (simulated async operation).
+    Retrieves a user's profile data from Firestore.
     """
-    # Simulate an asynchronous operation, e.g., fetching from an external service
-    await asyncio.sleep(0.1) # Non-blocking sleep
+    if not user_id:
+        return {"success": False, "message": "User ID is required to fetch profile."}
 
-    tips = [
-        "Use a strong, unique password.",
-        "Enable two-factor authentication for added security.",
-        "Keep your recovery email and phone number updated.",
-        "Be wary of phishing attempts; always check the URL.",
-        "Use a password manager to store complex passwords."
-    ]
-    return {"success": True, "tips": tips}
-
-
-def get_user_profile_backend(uid):
-    """
-    Fetches user profile data from Firestore.
-    """
     try:
-        user_profile_doc = user_profiles_collection.document(uid).get()
-        if user_profile_doc.exists:
-            profile_data = user_profile_doc.to_dict()
-            # Also fetch emailVerified status directly from Firebase Auth
-            firebase_user = auth.get_user(uid)
-            profile_data['emailVerified'] = firebase_user.email_verified
+        profile_doc = USER_PROFILES_COLLECTION.document(user_id).get()
+        if profile_doc.exists:
+            profile_data = profile_doc.to_dict()
+            profile_data['name'] = profile_data.get('name', 'N/A')
+            profile_data['username'] = profile_data.get('username', 'N/A')
             return {"success": True, "profile": profile_data}
         else:
             return {"success": False, "message": "User profile not found."}
-    except exceptions.FirebaseError as e:
-        print(f"Firebase error fetching user profile: {e}")
-        return {"success": False, "message": f"Error fetching profile: {str(e)}"}
     except Exception as e:
-        print(f"Unexpected error fetching user profile: {e}")
-        return {"success": False, "message": "An unexpected error occurred."}
+        print(f"Error fetching user profile: {e}")
+        return {"success": False, "message": f"Failed to fetch profile: {e}"}
 
+# --- Update User Address ---
+def update_user_address_backend(user_id: str, address: str) -> dict:
+    """
+    Updates a user's address in their Firestore profile.
+    """
+    if not user_id or address is None:
+        return {"success": False, "message": "User ID and address are required."}
 
-def update_user_address_backend(uid, address):
-    """
-    Updates the user's address in their Firestore profile.
-    """
     try:
-        user_profile_doc_ref = user_profiles_collection.document(uid)
-        user_profile_doc_ref.update({'address': address, 'updatedAt': firestore.SERVER_TIMESTAMP})
+        USER_PROFILES_COLLECTION.document(user_id).update({'address': address})
+        print(f"User '{user_id}' address updated to: '{address}'")
         return {"success": True, "message": "Address updated successfully."}
-    except exceptions.FirebaseError as e:
-        print(f"Firebase error updating address: {e}")
-        return {"success": False, "message": f"Error updating address: {str(e)}"}
     except Exception as e:
-        print(f"Unexpected error updating address: {e}")
-        return {"success": False, "message": "An unexpected error occurred."}
+        print(f"Error updating user address: {e}")
+        return {"success": False, "message": f"Failed to update address: {e}"}
 
+# --- Handle Google Authentication Backend ---
+def handle_google_auth_backend(id_token: str, display_name: str, email: str, photo_url: str) -> dict:
+    """
+    Verifies the Google ID token and handles user creation/login.
+    If a user with this email already exists (via password or another provider),
+    it will attempt to link the Google credential. If not, it creates a new user.
+    It also ensures a user profile is created/updated in Firestore.
+    """
+    if not id_token:
+        return {"success": False, "message": "Google ID token is missing."}
+    if not email:
+        return {"success": False, "message": "Email is required for Google authentication."}
 
-def handle_google_auth_backend(id_token, display_name, email, photo_url):
-    """
-    Handles Google Sign-In/Sign-Up by verifying the ID token and
-    creating/updating user profile in Firestore.
-    """
     try:
-        # Verify the ID token to get the UID
-        decoded_token = auth.verify_id_token(id_token)
+        decoded_token = auth.verify_id_token(id_token, check_revoked=True)
         uid = decoded_token['uid']
+        print(f"Google ID Token verified for UID: {uid}")
 
-        # Check if user already exists in Firestore profiles
-        user_profile_doc_ref = user_profiles_collection.document(uid)
-        user_profile_doc = user_profile_doc_ref.get()
+        try:
+            user = auth.get_user(uid)
+            print(f"User with UID {uid} already exists in Firebase Auth.")
 
-        if user_profile_doc.exists:
-            # User profile already exists, update if necessary
-            user_profile_doc_ref.update({
-                'name': display_name,
-                'email': email,
-                'photoURL': photo_url,
-                'emailVerified': True, # Google accounts are typically email verified
-                'lastLogin': firestore.SERVER_TIMESTAMP
-            })
-            message = "Google login successful. Profile updated."
-        else:
-            # New Google user, create profile
-            # Attempt to find an existing username or generate one if needed
-            username = email.split('@')[0] # Default username from email
-            # You might want more sophisticated username generation/checking for Google users
-            # For simplicity, we'll try to use a derived username.
+            USER_PROFILES_COLLECTION.document(uid).set({
+                'name': display_name or user.display_name,
+                'email': email or user.email,
+                'photoURL': photo_url or user.photo_url,
+                'lastLogin': firestore.SERVER_TIMESTAMP,
+                'authProvider': 'google'
+            }, merge=True)
 
-            # Check if this derived username is already taken by a non-Google user
-            username_taken = usernames_collection.document(username).get().exists
-            if username_taken:
-                # If the derived username is taken, append a unique identifier
-                username = f"{username}-{uid[:4]}" # Append first 4 chars of UID
+            return {"success": True, "message": "Successfully signed in with Google."}
+        except auth.UserNotFoundError:
+            try:
+                user_by_email = auth.get_user_by_email(email)
+                print(f"User with email {email} already exists but different UID. Attempting to link.")
+                return {"success": False, "message": "An account with this email already exists using a different sign-in method. Please use that method to log in."}
 
-            # Store username mapping
-            usernames_collection.document(username).set({
-                'uid': uid,
-                'email': email,
-                'timestamp': firestore.SERVER_TIMESTAMP
-            })
+            except auth.UserNotFoundError:
+                print(f"Creating new user for Google sign-in: {email}")
+                user = auth.create_user(
+                    uid=uid,
+                    email=email,
+                    display_name=display_name,
+                    photo_url=photo_url,
+                    email_verified=decoded_token.get('email_verified', False) # Google usually provides verified email
+                )
+                print(f"New Firebase Auth user created for Google: {user.uid}")
 
-            user_profile_doc_ref.set({
-                'name': display_name,
-                'username': username, # Store the chosen/generated username
-                'email': email,
-                'photoURL': photo_url,
-                'emailVerified': True, # Google accounts are typically email verified
-                'createdAt': firestore.SERVER_TIMESTAMP,
-                'lastLogin': firestore.SERVER_TIMESTAMP
-            })
-            message = "Google sign-up successful. Welcome!"
+                USER_PROFILES_COLLECTION.document(user.uid).set({
+                    'name': display_name,
+                    'username': email.split('@')[0],
+                    'email': email,
+                    'photoURL': photo_url,
+                    'createdAt': firestore.SERVER_TIMESTAMP,
+                    'emailVerified': decoded_token.get('email_verified', False), # Use Google's verification status
+                    'authProvider': 'google'
+                })
+                print(f"User profile for Google user '{email}' stored in Firestore.")
+                return {"success": True, "message": "Successfully signed up with Google."}
 
-        return {"success": True, "message": message}
-
-    except exceptions.FirebaseError as e:
-        print(f"Firebase error during Google auth backend: {e}")
-        return {"success": False, "message": f"Firebase error: {str(e)}"}
+    except auth.InvalidIdTokenError:
+        print(f"Invalid Google ID token: {id_token}")
+        return {"success": False, "message": "Invalid or expired Google ID token."}
+    except auth.CertificateFetchError:
+        print(f"Certificate fetch error (Firebase Admin SDK): Check network or Firebase project setup.")
+        return {"success": False, "message": "Server error during token verification. Please try again."}
     except Exception as e:
-        print(f"Unexpected error during Google auth backend: {e}")
-        return {"success": False, "message": "An unexpected error occurred during Google authentication."}
+        print(f"General error during Google authentication: {e}")
+        return {"success": False, "message": f"Google authentication failed: {e}"}
 
+# NEW: Change Password Backend Function
+def change_password_backend(user_id: str, new_password: str) -> dict:
+    """
+    Changes the password for a given user ID in Firebase Authentication.
+    Also revokes all refresh tokens for the user to invalidate existing sessions.
+    """
+    if not user_id or not new_password:
+        return {"success": False, "message": "User ID and new password are required."}
 
-def save_feedback_backend(uid, feedback_message):
-    """
-    Saves user feedback to the Firestore 'feedback' collection.
-    """
+    if len(new_password) < 6:
+        return {"success": False, "message": "New password must be at least 6 characters long."}
+
     try:
-        # Get user details for context
-        user_profile_doc = user_profiles_collection.document(uid).get()
+        auth.update_user(user_id, password=new_password)
+        print(f"Password updated for user: {user_id}")
+
+        # Invalidate all refresh tokens for the user to force re-login
+        auth.revoke_refresh_tokens(user_id)
+        print(f"Refresh tokens revoked for user: {user_id}")
+
+        return {"success": True, "message": "Password updated successfully. Please log in again."}
+    except auth.UserNotFoundError:
+        return {"success": False, "message": "User not found."}
+    except Exception as e:
+        print(f"Error changing password for user {user_id}: {e}")
+        return {"success": False, "message": f"Failed to change password: {e}"}
+
+# NEW: Save Feedback Backend Function
+def save_feedback_backend(uid: str, feedback_message: str) -> dict:
+    """
+    Stores user feedback in a Firestore collection.
+    """
+    if not feedback_message:
+        return {"success": False, "message": "Feedback message cannot be empty."}
+
+    try:
+        # Get user's name and username for more context in feedback
+        user_profile_doc = USER_PROFILES_COLLECTION.document(uid).get()
         user_data = user_profile_doc.to_dict() if user_profile_doc.exists else {}
         
         feedback_data = {
@@ -377,7 +410,7 @@ def save_feedback_backend(uid, feedback_message):
             'user_name': user_data.get('name', 'N/A')
         }
         
-        feedback_collection.add(feedback_data) # Use add() for auto-generated document ID
+        FEEDBACK_COLLECTION.add(feedback_data) # Use add() for auto-generated document ID
         print(f"Feedback from {uid} saved to Firestore.")
         return {"success": True, "message": "Feedback saved successfully!"}
     except Exception as e:
