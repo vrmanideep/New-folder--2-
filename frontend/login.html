@@ -207,250 +207,393 @@
         </p>
     </div>
 
-    <script type="module">
-        // Import Firebase SDK modules
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-        import { getAuth, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+<script type="module">
+    // Import Firebase SDK modules
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithCustomToken, signInWithPopup, GoogleAuthProvider, sendPasswordResetEmail, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-        // Placeholder for Firebase client configuration (will be fetched from backend)
-        let firebaseClientConfig = {};
-        let firebaseAuthInstance; // Store the auth instance
+    const loginForm = document.getElementById('login-form');
+    const identifierInput = document.getElementById('identifier');
+    const passwordInput = document.getElementById('password');
+    const loginMessage = document.getElementById('login-message');
+    const googleLoginButton = document.getElementById('google-login-button');
+    const forgotPasswordLink = document.getElementById('forgot-password-link');
+    const loginTipsButton = document.getElementById('login-tips-button');
+    const loginTipsModalOverlay = document.getElementById('login-tips-modal-overlay');
+    const loginTipsContent = document.getElementById('login-tips-content');
+    const closeLoginTipsModalButton = document.getElementById('close-login-tips-modal');
 
-        // Custom message box function (replaces alert)
-        function showMessageBox(message, type = 'info') {
-            const messageBox = document.createElement('div');
-            messageBox.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white z-[3000]`;
-            
-            let bgColor = '';
-            if (type === 'success') {
-                bgColor = 'bg-green-500';
-            } else if (type === 'error') {
-                bgColor = 'bg-red-500';
-            } else {
-                bgColor = 'bg-blue-500';
-            }
-            messageBox.classList.add(bgColor);
-            
-            messageBox.textContent = message;
-            document.body.appendChild(messageBox);
+    let firebaseApp;
+    let firebaseAuth;
+    let currentUser; // Stores the current authenticated Firebase user object
 
-            setTimeout(() => {
-                messageBox.remove();
-            }, 3000); // Message disappears after 3 seconds
+    // Custom message box function (replaces alert)
+    function showMessageBox(message, type = 'info') {
+        const messageBox = document.createElement('div');
+        messageBox.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white z-[3000]`;
+        
+        let bgColor = '';
+        if (type === 'success') {
+            bgColor = 'bg-green-500';
+        } else if (type === 'error') {
+            bgColor = 'bg-red-500';
+        } else {
+            bgColor = 'bg-blue-500';
         }
+        messageBox.classList.add(bgColor);
+        
+        messageBox.textContent = message;
+        document.body.appendChild(messageBox);
 
-        // Function to fetch client config from backend
-        async function fetchFirebaseClientConfig() {
-            try {
+        setTimeout(() => {
+            messageBox.remove();
+        }, 3000); // Message disappears after 3 seconds
+    }
+
+    // Function to fetch client config from backend and initialize Firebase
+    async function fetchFirebaseClientConfigAndInit() {
+        console.log("fetchFirebaseClientConfigAndInit called.");
+        let configToUse = null;
+        let tokenToUse = null;
+
+        try {
+            // 1. Try to get config and token from Canvas global variables
+            if (typeof __firebase_config !== 'undefined' && __firebase_config !== null) {
+                configToUse = JSON.parse(__firebase_config);
+                console.log("Firebase Config loaded from __firebase_config global.");
+            }
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token !== null) {
+                tokenToUse = __initial_auth_token;
+                console.log("Initial Auth Token loaded from __initial_auth_token global.");
+            }
+
+            // 2. If Canvas globals are not available, fetch from backend API (for local dev/fallback)
+            if (!configToUse) {
+                console.warn("Canvas global __firebase_config not found. Attempting to fetch from /api/firebase-config.");
                 const response = await fetch('/api/firebase-config');
-                const config = await response.json();
-                if (config.success && config.config) {
-                    firebaseClientConfig = config.config;
-                    // Initialize Firebase App ONLY after config is fetched
-                    const app = initializeApp(firebaseClientConfig);
-                    firebaseAuthInstance = getAuth(app); // Assign to global variable
-                    console.log("Firebase client app initialized.");
-
-                    // Listen for auth state changes (important for home.html)
-                    onAuthStateChanged(firebaseAuthInstance, (user) => {
-                        if (user) {
-                            console.log("Firebase Auth State Changed: User is logged in.", user.uid);
-                            // If user is logged in and email is verified, redirect to home.html
-                            if (user.emailVerified) {
-                                window.location.href = 'home.html';
-                            } else {
-                                // If user is logged in but email not verified, redirect to email verification page
-                                showMessageBox('Please verify your email to continue.', 'warning');
-                                window.location.href = `email_verification.html?email=${encodeURIComponent(user.email)}`;
-                            }
-                        } else {
-                            console.log("Firebase Auth State Changed: User is logged out.");
-                            // If user is on a protected page and logs out, redirect to login
-                            if (window.location.pathname.includes('home.html')) {
-                                window.location.href = 'login.html';
-                            }
-                        }
-                    });
-
+                const configResult = await response.json();
+                if (configResult.success && configResult.config) {
+                    configToUse = configResult.config;
+                    console.log("Firebase client config fetched from /api/firebase-config.");
                 } else {
-                    console.error("Failed to fetch Firebase client config:", config.message);
+                    console.error("Failed to fetch Firebase client config from backend:", configResult.message);
                     showMessageBox("Error: Could not initialize Firebase. Please try again.", "error");
+                    return; // Stop execution if config is not available
                 }
-            } catch (error) {
-                console.error("Network error fetching Firebase client config:", error);
-                showMessageBox("Network error: Could not initialize Firebase.", "error");
-            }
-        }
-
-        // Fetch config and initialize Firebase on page load
-        fetchFirebaseClientConfig();
-
-
-        const loginForm = document.getElementById('login-form');
-        const identifierInput = document.getElementById('identifier');
-        const passwordInput = document.getElementById('password');
-        const loginButton = loginForm.querySelector('.login-button'); // Get button for disabling
-        const loginMessage = document.getElementById('login-message');
-        const googleSignInButton = document.getElementById('google-signin-button');
-
-        // --- Email/Username/Password Login ---
-        loginForm.addEventListener('submit', async (event) => {
-            event.preventDefault(); // Prevent default form submission
-
-            const identifier = identifierInput.value.trim();
-            const password = passwordInput.value.trim();
-
-            loginMessage.textContent = ''; // Clear previous messages
-            loginMessage.className = 'message'; // Reset classes
-            showMessageBox('', 'info'); // Clear previous pop-up message
-
-            if (!identifier || !password) {
-                loginMessage.textContent = 'Please enter both username/email and password.';
-                loginMessage.classList.add('error');
-                showMessageBox('Please enter both username/email and password.', 'error');
-                return;
             }
 
-            loginMessage.textContent = 'Logging in...';
-            loginMessage.classList.add('info');
-            loginButton.disabled = true; // Disable login button
-            googleSignInButton.disabled = true; // Disable Google button
+            // Initialize Firebase App
+            if (!firebaseApp) { // Only initialize if not already initialized
+                firebaseApp = initializeApp(configToUse);
+                firebaseAuth = getAuth(firebaseApp);
+                console.log("Firebase client app initialized.");
+            }
 
-            try {
-                // Check if the identifier is likely an email (contains '@')
-                if (identifier.includes('@')) {
-                    // Attempt to sign in with email and password directly using Firebase Client SDK
-                    const userCredential = await signInWithEmailAndPassword(firebaseAuthInstance, identifier, password);
-                    const user = userCredential.user;
-
-                    console.log("Firebase Email/Password Sign-In successful on client:", user.uid);
-                    loginMessage.textContent = 'Login successful!';
-                    loginMessage.classList.add('success');
-                    showMessageBox('Login successful!', 'success');
-                    // The onAuthStateChanged listener will handle redirection based on email verification status
-
+            // Handle initial authentication (only for login.html and home.html where it's relevant)
+            if (window.location.pathname.includes('home.html') || window.location.pathname.includes('login.html')) {
+                if (tokenToUse) {
+                    try {
+                        await signInWithCustomToken(firebaseAuth, tokenToUse);
+                        console.log("Signed in with custom token.");
+                    } catch (e) {
+                        console.warn("Custom token sign-in failed, attempting anonymous sign-in or redirect:", e);
+                        await signInAnonymously(firebaseAuth); // Fallback
+                    }
                 } else {
-                    // If it's not an email, assume it's a username and send to backend for resolution
-                    console.log("Attempting login with username:", identifier);
-                    const response = await fetch('/api/login', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ identifier, password }),
-                    });
+                    await signInAnonymously(firebaseAuth); // Sign in anonymously if no custom token
+                    console.log("Signed in anonymously.");
+                }
+            }
 
-                    const result = await response.json();
 
-                    if (response.ok && result.success && result.token) {
-                        // Use Firebase JS SDK to sign in with the custom token received from backend
-                        if (firebaseAuthInstance) {
-                            await signInWithCustomToken(firebaseAuthInstance, result.token);
-                            console.log("Signed in with custom token after username login.");
-                            loginMessage.textContent = result.message;
-                            loginMessage.classList.add('success');
-                            showMessageBox(result.message, 'success');
-                            // The onAuthStateChanged listener will handle redirection based on email verification status
+            // Set up the Auth State Changed listener (crucial for all pages)
+            onAuthStateChanged(firebaseAuth, (user) => {
+                console.log("Auth state changed, user:", user ? user.uid : "null");
+                if (user) {
+                    currentUser = user; // Set current user globally
+                    // Page-specific UI updates and redirections
+                    if (window.location.pathname.includes('home.html')) {
+                        // This block won't be hit on login.html, but kept for general script
+                        // updateUserUI(currentUser);
+                        // updateWelcomeMessage(currentUser);
+                    } else if (window.location.pathname.includes('login.html') || window.location.pathname.includes('register.html')) {
+                        if (user.emailVerified) {
+                            window.location.href = 'home.html';
                         } else {
-                            loginMessage.textContent = 'Firebase not initialized. Please try again.';
-                            loginMessage.classList.add('error');
-                            showMessageBox('Firebase not initialized. Please try again.', 'error');
+                            showMessageBox('Please verify your email to continue.', 'warning');
+                            window.location.href = `email_verification.html?email=${encodeURIComponent(user.email)}`;
                         }
-                    } else {
-                        loginMessage.textContent = result.message || 'Login failed. Please try again.';
-                        loginMessage.classList.add('error');
-                        showMessageBox(result.message || 'Login failed. Please try again.', 'error');
+                    } else if (window.location.pathname.includes('email_verification.html')) {
+                        if (user.emailVerified) {
+                            showMessageBox('Your email is verified. Redirecting to login.', 'success');
+                            setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+                        }
+                    }
+                } else {
+                    currentUser = null; // Clear current user
+                    // On login/register pages, if user logs out, they stay on the page.
+                    // For other pages, if user logs out, redirect to login.
+                    if (!window.location.pathname.includes('login.html') && !window.location.pathname.includes('register.html')) {
+                        console.log("User logged out or session expired. Redirecting to login.");
+                        window.location.href = 'login.html';
                     }
                 }
+            });
 
-            } catch (error) {
-                console.error('Login error:', error);
-                let displayMessage = 'Login failed. Please check your credentials.';
-                if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-                    displayMessage = 'Invalid username/email or password.';
-                } else if (error.code === 'auth/invalid-email') {
-                    displayMessage = 'Please enter a valid email address.';
-                } else if (error.code === 'auth/too-many-requests') {
-                    displayMessage = 'Too many failed login attempts. Please try again later.';
-                } else if (error.code === 'auth/network-request-failed') {
-                    displayMessage = 'Network error. Please check your internet connection.';
-                } else if (error.code === 'auth/invalid-custom-token') {
-                    displayMessage = 'Invalid login credentials (custom token error).';
-                }
-                else {
-                    displayMessage = `Login failed: ${error.message}`;
-                }
-                loginMessage.textContent = displayMessage;
-                loginMessage.classList.add('error');
-                showMessageBox(displayMessage, 'error');
-            } finally {
-                loginButton.disabled = false; // Re-enable login button
-                googleSignInButton.disabled = false; // Re-enable Google button
+        } catch (error) {
+            console.error("Critical error during Firebase initialization or auth:", error);
+            showMessageBox("Critical error: Could not initialize application. Please try again.", "error");
+            // Fallback to login page if anything goes wrong
+            if (window.location.pathname !== '/login.html') {
+                window.location.href = 'login.html';
             }
-        });
+        }
+    }
 
-        // --- Google Sign-In ---
-        googleSignInButton.addEventListener('click', async () => {
-            loginMessage.textContent = 'Signing in with Google...';
-            loginMessage.className = 'message info';
-            showMessageBox('Signing in with Google...', 'info');
-            loginButton.disabled = true; // Disable traditional login button
-            googleSignInButton.disabled = true; // Disable Google button itself
+    loginForm.addEventListener('submit', async (event) => {
+        event.preventDefault(); // Prevent default form submission
 
+        const identifier = identifierInput.value.trim();
+        const password = passwordInput.value.trim();
+
+        loginMessage.textContent = ''; // Clear previous messages
+        loginMessage.className = 'status-message'; // Reset class
+
+        if (!identifier || !password) {
+            loginMessage.textContent = 'Please enter both username/email and password.';
+            loginMessage.classList.add('error');
+            return;
+        }
+
+        loginMessage.textContent = 'Logging in...';
+        loginMessage.classList.add('info');
+
+        try {
+            // First, attempt to sign in with email/password using Firebase Client SDK
+            // This handles the actual password verification
+            let userCredential;
             try {
-                const provider = new GoogleAuthProvider();
-                const result = await signInWithPopup(firebaseAuthInstance, provider);
-                const user = result.user;
-                const idToken = await user.getIdToken(); // Get the ID token from Google Sign-In
+                userCredential = await signInWithEmailAndPassword(firebaseAuth, identifier, password);
+            } catch (firebaseClientError) {
+                // If direct email/password login fails, check if identifier is a username
+                if (firebaseClientError.code === 'auth/invalid-email' || firebaseClientError.code === 'auth/user-not-found' || firebaseClientError.code === 'auth/wrong-password') {
+                    // If it's not a valid email or user not found by email, try backend username lookup
+                    const backendResponse = await fetch('/api/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ identifier, password })
+                    });
+                    const backendResult = await backendResponse.json();
 
-                console.log("Google Sign-In successful on client. Sending ID token to backend.");
-
-                // Send the ID token to your Flask backend for verification and profile management
-                const backendResponse = await fetch('/api/google-auth', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${idToken}` // Send Google ID token
-                    },
-                    body: JSON.stringify({
-                        displayName: user.displayName,
-                        email: user.email,
-                        photoURL: user.photoURL
-                    })
-                });
-
-                const backendResult = await backendResponse.json();
-
-                if (backendResponse.ok && backendResult.success) {
-                    loginMessage.textContent = backendResult.message;
-                    loginMessage.classList.add('success');
-                    showMessageBox(backendResult.message, 'success');
-                    // For Google Sign-In, the email is usually already verified.
-                    // The onAuthStateChanged listener will handle redirection to home.html
+                    if (backendResponse.ok && backendResult.success && backendResult.customToken) {
+                        // If backend successfully resolved username and provided custom token, sign in with it
+                        userCredential = await signInWithCustomToken(firebaseAuth, backendResult.customToken);
+                        console.log("Signed in with custom token after username lookup.");
+                    } else {
+                        // If backend also failed, propagate the error
+                        throw new Error(backendResult.message || 'Login failed via username lookup.');
+                    }
                 } else {
-                    loginMessage.textContent = backendResult.message || 'Google sign-in failed on server.';
-                    loginMessage.classList.add('error');
-                    showMessageBox(backendResult.message || 'Google sign-in failed on server.', 'error');
-                    // Optionally sign out from client-side Firebase if backend fails
-                    await firebaseAuthInstance.signOut();
+                    // Re-throw other Firebase client errors
+                    throw firebaseClientError;
                 }
-
-            } catch (error) {
-                console.error('Google Sign-In error:', error);
-                let displayMessage = 'Network error during Google sign-in. Please try again.';
-                if (error.code === 'auth/popup-closed-by-user') {
-                    displayMessage = 'Google sign-in cancelled.';
-                } else if (error.code) {
-                    displayMessage = `Google Sign-In Error: ${error.message}`;
-                }
-                loginMessage.textContent = displayMessage;
-                loginMessage.classList.add('error');
-                showMessageBox(displayMessage, 'error');
-            } finally {
-                loginButton.disabled = false; // Re-enable traditional login button
-                googleSignInButton.disabled = false; // Re-enable Google button
             }
-        });
-    </script>
+
+            const user = userCredential.user;
+            currentUser = user; // Update global currentUser
+
+            if (user.emailVerified) {
+                loginMessage.textContent = 'Login successful! Redirecting...';
+                loginMessage.classList.add('success');
+                setTimeout(() => {
+                    window.location.href = 'home.html';
+                }, 1000);
+            } else {
+                loginMessage.textContent = 'Please verify your email to continue.';
+                loginMessage.classList.add('warning');
+                setTimeout(() => {
+                    window.location.href = `email_verification.html?email=${encodeURIComponent(user.email)}`;
+                }, 1000);
+            }
+
+        } catch (error) {
+            console.error('Login error:', error);
+            let errorMessage = 'An unexpected error occurred. Please try again.';
+
+            if (error.code) {
+                switch (error.code) {
+                    case 'auth/invalid-email':
+                    case 'auth/user-not-found':
+                    case 'auth/wrong-password':
+                        errorMessage = 'Invalid username/email or password.';
+                        break;
+                    case 'auth/too-many-requests':
+                        errorMessage = 'Too many failed login attempts. Please try again later.';
+                        break;
+                    case 'auth/network-request-failed':
+                        errorMessage = 'Network error. Please check your internet connection.';
+                        break;
+                    case 'auth/user-disabled':
+                        errorMessage = 'Your account has been disabled.';
+                        break;
+                    default:
+                        errorMessage = error.message;
+                }
+            } else if (error.message) {
+                errorMessage = error.message; // For errors from backend or custom errors
+            }
+
+            loginMessage.textContent = errorMessage;
+            loginMessage.classList.add('error');
+        }
+    });
+
+    googleLoginButton.addEventListener('click', async () => {
+        try {
+            const provider = new GoogleAuthProvider();
+            const result = await signInWithPopup(firebaseAuth, provider);
+            const user = result.user;
+            const idToken = await user.getIdToken();
+
+            // Send ID token and user info to your backend for profile creation/update
+            const response = await fetch('/api/google-auth', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}` // Send the ID token for backend verification
+                },
+                body: JSON.stringify({
+                    displayName: user.displayName,
+                    email: user.email,
+                    photoURL: user.photoURL
+                })
+            });
+
+            const backendResult = await response.json();
+
+            if (response.ok && backendResult.success) {
+                loginMessage.textContent = backendResult.message + " Redirecting...";
+                loginMessage.classList.add('success');
+                setTimeout(() => {
+                    window.location.href = 'home.html';
+                }, 1000);
+            } else {
+                loginMessage.textContent = backendResult.message || 'Google login failed on backend.';
+                loginMessage.classList.add('error');
+            }
+
+        } catch (error) {
+            console.error('Google login error:', error);
+            let errorMessage = 'Google login failed. Please try again.';
+            if (error.code === 'auth/popup-closed-by-user') {
+                errorMessage = 'Google login popup closed.';
+            } else if (error.code === 'auth/cancelled-popup-request') {
+                errorMessage = 'Google login already in progress.';
+            } else if (error.code === 'auth/operation-not-allowed') {
+                errorMessage = 'Google sign-in is not enabled in Firebase. Please enable it.';
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            loginMessage.textContent = errorMessage;
+            loginMessage.classList.add('error');
+        }
+    });
+
+    forgotPasswordLink.addEventListener('click', async (event) => {
+        event.preventDefault();
+        const email = identifierInput.value.trim(); // Use the identifier field for email
+
+        if (!email || !email.includes('@')) {
+            loginMessage.textContent = 'Please enter your registered email in the field above to reset password.';
+            loginMessage.classList.add('error');
+            return;
+        }
+
+        loginMessage.textContent = 'Sending password reset email...';
+        loginMessage.classList.add('info');
+
+        try {
+            await sendPasswordResetEmail(firebaseAuth, email);
+            loginMessage.textContent = 'Password reset email sent! Check your inbox.';
+            loginMessage.classList.add('success');
+        } catch (error) {
+            console.error('Password reset error:', error);
+            let errorMessage = 'Failed to send password reset email.';
+            if (error.code === 'auth/user-not-found') {
+                errorMessage = 'No user found with that email address.';
+            } else if (error.code === 'auth/invalid-email') {
+                errorMessage = 'Please enter a valid email address.';
+            }
+            loginMessage.textContent = errorMessage;
+            loginMessage.classList.add('error');
+        }
+    });
+
+    loginTipsButton.addEventListener('click', async () => {
+        loginTipsContent.innerHTML = '<p class="text-center text-gray-500">Loading tips...</p>';
+        loginTipsModalOverlay.classList.add('show');
+
+        try {
+            const response = await fetch('/api/login-tips');
+            const result = await response.json();
+
+            if (response.ok && result.success && result.tips) {
+                loginTipsContent.innerHTML = '<ul>' + result.tips.map(tip => `<li class="mb-2 last:mb-0">${tip}</li>`).join('') + '</ul>';
+            } else {
+                loginTipsContent.innerHTML = `<p class="text-center text-red-500">${result.message || 'Failed to load tips.'}</p>`;
+            }
+        } catch (error) {
+            console.error('Error fetching login tips:', error);
+            loginTipsContent.innerHTML = '<p class="text-center text-red-500">Network error. Could not load tips.</p>';
+        }
+    });
+
+    closeLoginTipsModalButton.addEventListener('click', () => {
+        loginTipsModalOverlay.classList.remove('show');
+    });
+
+    // Light/Dark Mode Toggle Logic
+    const themeToggleButton = document.getElementById('theme-toggle');
+    const themeIcon = document.getElementById('theme-icon');
+
+    function applyTheme(theme) {
+        if (theme === 'dark') {
+            document.body.classList.remove('light-mode');
+            themeIcon.textContent = '🌙'; // Moon icon for dark mode
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.body.classList.add('light-mode');
+            themeIcon.textContent = '☀️'; // Sun icon for light mode
+            localStorage.setItem('theme', 'light');
+        }
+    }
+
+    function toggleTheme() {
+        const currentTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        if (currentTheme === 'dark') {
+            applyTheme('light');
+        } else {
+            applyTheme('dark');
+        }
+    }
+
+    themeToggleButton.addEventListener('click', toggleTheme);
+
+    // Apply theme on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchFirebaseClientConfigAndInit(); // Initialize Firebase first
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+            applyTheme(savedTheme);
+        } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            applyTheme('dark');
+        } else {
+            applyTheme('light');
+        }
+    });
+</script>
+
 </body>
 </html>
