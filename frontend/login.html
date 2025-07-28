@@ -251,7 +251,7 @@
 <script type="module">
     // Import Firebase SDK modules
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithCustomToken, signInWithPopup, GoogleAuthProvider, sendPasswordResetEmail, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithCustomToken, signInWithPopup, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
     const loginForm = document.getElementById('login-form');
     const identifierInput = document.getElementById('identifier');
@@ -307,7 +307,7 @@
             }
             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token !== null) {
                 tokenToUse = __initial_auth_token;
-                console.log("Initial Auth Token loaded from __initial_auth_token global.");
+                console.log("Initial Auth Token loaded from __initial_auth_token global:", tokenToUse ? "present" : "absent");
             }
 
             // 2. If Canvas globals are not available, fetch from backend API (for local dev/fallback)
@@ -347,19 +347,25 @@
                 }
             }
 
-            // Handle initial authentication (only for login.html and home.html where it's relevant)
-            if (window.location.pathname.includes('home.html') || window.location.pathname.includes('login.html')) {
+            // Handle initial authentication for login.html
+            if (window.location.pathname.includes('login.html')) {
                 if (tokenToUse) {
                     try {
                         await signInWithCustomToken(firebaseAuth, tokenToUse);
-                        console.log("Signed in with custom token.");
+                        console.log("Signed in with custom token on login.html.");
                     } catch (e) {
-                        console.warn("Custom token sign-in failed, attempting anonymous sign-in or redirect:", e);
-                        await signInAnonymously(firebaseAuth); // Fallback
+                        console.warn("Custom token sign-in failed on login.html:", e);
+                        // If custom token fails, and no user is currently authenticated, do nothing.
+                        // The page will remain on the login screen, waiting for user input.
+                        if (!firebaseAuth.currentUser) {
+                            console.log("No current user after custom token failure. Remaining on login page.");
+                        }
                     }
                 } else {
-                    await signInAnonymously(firebaseAuth); // Sign in anonymously if no custom token
-                    console.log("Signed in anonymously.");
+                    // If no initial token, and no current user, remain on login page.
+                    if (!firebaseAuth.currentUser) {
+                        console.log("No initial auth token and no current user. Remaining on login page.");
+                    }
                 }
             }
 
@@ -368,13 +374,8 @@
                 console.log("Auth state changed, user:", user ? user.uid : "null");
                 if (user) {
                     currentUser = user; // Set current user globally
-                    // Page-specific UI updates and redirections
-                    if (window.location.pathname.includes('home.html')) {
-                        // This block won't be hit on login.html, but kept for general script
-                        // updateUserUI(currentUser); // This function is in home.html, not login.html
-                        // updateWelcomeMessage(currentUser); // This function is in home.html, not login.html
-                    } else if (window.location.pathname.includes('login.html') || window.location.pathname.includes('register.html')) {
-                        // For login/register, if user is authenticated, always redirect to home
+                    // For login/register, if user is authenticated, always redirect to home
+                    if (window.location.pathname.includes('login.html') || window.location.pathname.includes('register.html')) {
                         window.location.href = 'home.html';
                     }
                 } else {
