@@ -642,7 +642,7 @@
             <input type="file" id="profile-picture-input" accept="image/*">
             <label for="profile-picture-input" class="custom-file-upload">Choose Image</label>
             <div class="modal-buttons">
-                <button id="upload-picture-button" class="modal-button confirm">Upload</button>
+                <button id="upload-picture-button" class="modal-button confirm" disabled>Upload</button>
                 <button id="cancel-upload-button" class="modal-button cancel">Cancel</button>
             </div>
             <p id="profile-upload-message" class="status-message"></p>
@@ -666,7 +666,7 @@
                 <input type="password" id="confirm-new-password" placeholder="Confirm new password">
             </div>
             <div class="modal-buttons">
-                <button id="submit-change-password-button" class="modal-button confirm">Change Password</button>
+                <button id="submit-change-password-button" class="modal-button confirm" disabled>Change Password</button>
                 <button id="cancel-change-password-button" class="modal-button cancel">Cancel</button>
             </div>
             <p id="change-password-message" class="status-message"></p>
@@ -867,8 +867,13 @@
                 // Assuming relevant buttons exist and are disabled initially
                 const uploadPictureButton = document.getElementById('upload-picture-button');
                 const submitFeedbackButton = document.getElementById('submit-feedback-button');
+                const submitChangePasswordButton = document.getElementById('submit-change-password-button'); // For change password modal
+                const confirmDeleteButton = document.getElementById('confirm-delete-button'); // For delete account modal
+
                 if (uploadPictureButton) uploadPictureButton.disabled = false;
                 if (submitFeedbackButton) submitFeedbackButton.disabled = false;
+                if (submitChangePasswordButton) submitChangePasswordButton.disabled = false;
+                if (confirmDeleteButton) confirmDeleteButton.disabled = false;
             }
 
             // Handle initial authentication (only for login.html and home.html where it's relevant)
@@ -1041,6 +1046,15 @@
             deleteModalMessage.classList.add('error');
             return;
         }
+        
+        // Ensure firebaseAuth is initialized before proceeding
+        if (!isFirebaseReady || !firebaseAuth) {
+            deleteModalMessage.textContent = 'Initializing Firebase. Please wait...';
+            deleteModalMessage.classList.add('info');
+            console.error("Firebase Auth is not initialized when deleting account.");
+            return;
+        }
+
 
         deleteModalMessage.textContent = "Deleting account...";
         deleteModalMessage.classList.add('info');
@@ -1506,7 +1520,14 @@
     }
 
     // Event listener for the theme toggle button
-    themeToggleButton.addEventListener('click', toggleTheme);
+    document.addEventListener('DOMContentLoaded', () => {
+        const themeToggleButton = document.getElementById('theme-toggle');
+        if (themeToggleButton) { // Check if element exists before adding listener
+            themeToggleButton.addEventListener('click', toggleTheme);
+        } else {
+            console.warn("Theme toggle button not found. Dark/light mode toggle will not function.");
+        }
+    });
 
     // Apply theme on page load
     document.addEventListener('DOMContentLoaded', () => {
