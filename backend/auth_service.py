@@ -1,7 +1,7 @@
 # backend/auth_service.py
 
 from firebase_admin import auth, firestore
-from .firebase_config import UNIQUE_USERNAMES_COLLECTION, USER_PROFILES_COLLECTION, EMAIL_OTPS_COLLECTION, APP_ID, db, FEEDBACK_COLLECTION
+from .firebase_config import UNIQUE_USERNAMES_COLLECTION, USER_PROFILES_COLLECTION, APP_ID, db, FEEDBACK_COLLECTION
 import random
 import string
 import time
@@ -9,12 +9,13 @@ import os
 import json
 from typing import Union, List
 
-# Import SendGrid specific libraries (kept, but not used for verification flow)
+# Import SendGrid specific libraries (kept in case you use _send_email for other purposes)
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
 
 # --- Generic Email Sending Function (using SendGrid) ---
+# This function is kept for completeness but is not used in the current flow
 def _send_email(from_email: str, to_emails: Union[str, List[str]], subject: str, html_content: str) -> bool:
     """
     Sends a generic email using SendGrid.
@@ -54,27 +55,6 @@ def _send_email(from_email: str, to_emails: Union[str, List[str]], subject: str,
     except Exception as e:
         print(f"Error sending email with SendGrid: {e}")
         return False
-
-
-# --- Real Email Sending Function (using _send_email helper) ---
-# This function is now mostly for internal use if you decide to send other emails
-def _send_email_with_otp(email: str) -> bool:
-    """
-    Sends an email with an OTP using the generic _send_email helper.
-    """
-    otp = ''.join(random.choices(string.digits, k=6))
-    expiry_time = int(time.time()) + 300 # OTP valid for 5 minutes
-
-    EMAIL_OTPS_COLLECTION.document(email.lower()).set({
-        'otp': otp,
-        'expiry': expiry_time,
-        'createdAt': firestore.SERVER_TIMESTAMP
-    })
-    print(f"OTP '{otp}' stored for {email}.")
-
-    subject = 'Your One-Time Password (OTP) for Verification'
-    html_content = f'<strong>Your One-Time Password (OTP) is: {otp}</strong>'
-    return _send_email(os.getenv("SENDGRID_SENDER_EMAIL"), email, subject, html_content)
 
 
 # --- Backend Functions ---
@@ -145,9 +125,6 @@ def register_user_backend(name: str, username: str, email: str, password: str) -
         custom_token = auth.create_custom_token(user_id).decode('utf-8')
         print(f"Custom token generated for user: {user_id}")
 
-        # Removed: send_firebase_email_verification_backend(user.uid)
-        # Email verification is no longer enforced after registration.
-
         return {"success": True, "message": "Registration successful! You can now log in.", "custom_token": custom_token}
 
     except auth.EmailAlreadyExistsError:
@@ -155,27 +132,6 @@ def register_user_backend(name: str, username: str, email: str, password: str) -
     except Exception as e:
         print(f"Error during user registration: {e}")
         return {"success": False, "message": f"Registration failed: {e}"}
-
-def send_firebase_email_verification_backend(uid):
-    """
-    Generates a Firebase email verification link for the user.
-    This function is kept for completeness but is no longer called during registration.
-    """
-    try:
-        user = auth.get_user(uid)
-        if not user.email_verified:
-            action_code_settings = auth.ActionCodeSettings(
-                url='http://localhost:5000/email_verification.html',
-                handle_code_in_app=True,
-            )
-            link = auth.generate_email_verification_link(user.email, action_code_settings)
-            print(f"Firebase Email Verification Link generated for {user.email}: {link}")
-            return {"success": True, "message": "Verification email link generated."}
-        else:
-            return {"success": True, "message": "Email is already verified."}
-    except Exception as e:
-        print(f"Firebase error generating verification email link: {e}")
-        return {"success": False, "message": f"Failed to generate verification email link: {str(e)}"}
 
 
 def login_user_backend(identifier: str, password: str) -> dict:
@@ -234,13 +190,6 @@ def delete_user_data_backend(uid: str) -> dict:
             doc.reference.delete()
             print(f"Unique username mapping for '{uid}' deleted from Firestore.")
             break
-
-        # Delete associated OTP if exists (if email was used for OTP)
-        if user.email:
-            otp_doc_ref = EMAIL_OTPS_COLLECTION.document(user.email.lower())
-            if otp_doc_ref.get().exists:
-                otp_doc_ref.delete()
-                print(f"Associated OTP for '{user.email}' deleted from Firestore.")
 
         return {"success": True, "message": f"User '{uid}' and all associated data deleted successfully."}
 
