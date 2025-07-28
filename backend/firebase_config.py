@@ -3,13 +3,15 @@ from firebase_admin import credentials, auth, firestore
 import os
 from dotenv import load_dotenv
 import json
-import sys # <--- ADD THIS LINE
+import sys
+import base64 # <--- ADDED THIS LINE FOR BASE64 DECODING
 
 load_dotenv()
 
 # --- Configuration ---
 # All sensitive IDs and keys should be loaded from environment variables
-APP_ID = os.getenv("FIREBASE_PROJECT_ID") # Load APP_ID from env variable
+# APP_ID will be updated from the credential dictionary after initialization
+APP_ID = os.getenv("FIREBASE_PROJECT_ID")
 
 # --- Firebase Client-Side Config (for Frontend JS/SDK) ---
 FIREBASE_CLIENT_CONFIG = {
@@ -24,31 +26,37 @@ FIREBASE_CLIENT_CONFIG = {
 # Validate that essential client config values are present
 for key, value in FIREBASE_CLIENT_CONFIG.items():
     if not value:
-        # Changed print to sys.stderr for better visibility in Render logs
         print(f"WARNING: Firebase client config missing environment variable for {key}. Please set it.", file=sys.stderr)
 
 
 # --- Firebase Admin SDK Initialization ---
 def initialize_firebase():
     """Initializes the Firebase Admin SDK using environment variable."""
+    global APP_ID # Declare global to modify APP_ID
+
     if not firebase_admin._apps:
         try:
-            firebase_json = os.getenv("FIREBASE_CREDENTIAL_JSON")
+            # --- MODIFIED THESE LINES TO READ AND DECODE BASE64 ---
+            firebase_json_b64 = os.getenv("FIREBASE_CREDENTIAL_B64")
+            if not firebase_json_b64:
+                raise ValueError("FIREBASE_CREDENTIAL_B64 environment variable is missing.")
 
-            # --- ADD THESE DEBUGGING LINES HERE ---
-            print(f"DEBUG: Value of FIREBASE_CREDENTIAL_JSON (first 100 chars): {firebase_json[:100] if firebase_json else 'None'}...", file=sys.stderr)
-            print(f"DEBUG: Length of FIREBASE_CREDENTIAL_JSON: {len(firebase_json) if firebase_json else 0}", file=sys.stderr)
-            if firebase_json and "\\n" in firebase_json:
-                print("DEBUG: '\\n' found in FIREBASE_CREDENTIAL_JSON string (this is good).", file=sys.stderr)
+            # Decode the base64 string back to a JSON string
+            decoded_json_bytes = base64.b64decode(firebase_json_b64)
+            firebase_json_string = decoded_json_bytes.decode('utf-8')
+
+            # Debugging decoded string (optional, can be removed later)
+            print(f"DEBUG: Decoded JSON string (first 100 chars): {firebase_json_string[:100]}...", file=sys.stderr)
+            print(f"DEBUG: Length of Decoded JSON string: {len(firebase_json_string)}", file=sys.stderr)
+            if "\\n" in firebase_json_string:
+                print("DEBUG: '\\n' found in decoded JSON string (this is good).", file=sys.stderr)
             else:
-                print("DEBUG: '\\n' NOT found in FIREBASE_CREDENTIAL_JSON string (this is bad for private key).", file=sys.stderr)
-            # --- END DEBUGGING LINES ---
-
-            if not firebase_json:
-                raise ValueError("FIREBASE_CREDENTIAL_JSON environment variable is missing.")
+                print("DEBUG: '\\n' NOT found in decoded JSON string (this is bad for private key).", file=sys.stderr)
 
             # Convert JSON string to dict
-            cred_dict = json.loads(firebase_json)
+            cred_dict = json.loads(firebase_json_string)
+            # --- END OF MODIFIED LINES ---
+
             cred = credentials.Certificate(cred_dict)
 
             # Initialize Firebase Admin SDK with the storageBucket
@@ -56,14 +64,17 @@ def initialize_firebase():
                 'storageBucket': FIREBASE_CLIENT_CONFIG["storageBucket"]
             })
             print("Firebase Admin SDK initialized successfully with Storage Bucket.", file=sys.stderr)
+
+            # Update APP_ID from the credentials dictionary for consistency
+            APP_ID = cred_dict.get('project_id', APP_ID)
+
         except json.JSONDecodeError as e:
-            print(f"ERROR: Failed to decode JSON from FIREBASE_CREDENTIAL_JSON: {e}", file=sys.stderr)
-            # Print more of the problematic JSON string to help identify issues
-            print(f"ERROR: Faulty JSON start (first 500 chars): {firebase_json[:500] if firebase_json else 'N/A'}", file=sys.stderr)
-            raise  # Re-raise to stop app if JSON is malformed
+            print(f"ERROR: Failed to decode JSON from FIREBASE_CREDENTIAL_B64 (after base64 decode): {e}", file=sys.stderr)
+            print(f"ERROR: Problematic string start (first 500 chars after b64 decode): {firebase_json_string[:500] if 'firebase_json_string' in locals() else 'N/A'}", file=sys.stderr)
+            raise
         except ValueError as e:
             print(f"ERROR: Error initializing Firebase with certificate: {e}", file=sys.stderr)
-            raise  # Re-raise if cert is invalid
+            raise
         except Exception as e:
             print(f"ERROR: An unexpected error occurred during Firebase initialization: {e}", file=sys.stderr)
             raise
@@ -75,6 +86,7 @@ initialize_firebase()
 db = firestore.client()
 
 # --- Firestore Collection References ---
+# These will now use the APP_ID that was potentially updated from the credentials
 UNIQUE_USERNAMES_COLLECTION = db.collection(f'artifacts/{APP_ID}/public/data/usernames')
 USER_PROFILES_COLLECTION = db.collection(f'artifacts/{APP_ID}/public/data/user_profiles')
 FEEDBACK_COLLECTION = db.collection(f'artifacts/{APP_ID}/public/data/feedback')
