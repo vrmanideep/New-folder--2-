@@ -730,724 +730,759 @@
     </footer>
 
     <script type="module">
-        // Import Firebase SDK modules
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-        import { getAuth, onAuthStateChanged, signOut, signInAnonymously, signInWithCustomToken, updateProfile } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+    // Import Firebase SDK modules
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signOut, signInAnonymously, signInWithCustomToken, updateProfile, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-        const userAvatarButton = document.getElementById('user-avatar-button');
-        const userAvatarImg = document.getElementById('user-avatar');
-        const userDisplayNameSpan = document.getElementById('user-display-name');
-        const navbarUsernameDisplay = document.getElementById('navbar-username-display');
-        const userDropdownMenu = document.getElementById('user-dropdown-menu');
-        const logoutLink = document.getElementById('logout-link');
-        const profileLink = document.getElementById('profile-link');
-        const deleteAccountLink = document.getElementById('delete-account-link');
-        const welcomeHeading = document.getElementById('welcome-heading');
+    const userAvatarButton = document.getElementById('user-avatar-button');
+    const userAvatarImg = document.getElementById('user-avatar');
+    const userDisplayNameSpan = document.getElementById('user-display-name'); // This ID doesn't exist in HTML, kept for consistency if added later
+    const navbarUsernameDisplay = document.getElementById('navbar-username-display');
+    const userDropdownMenu = document.getElementById('user-dropdown-menu');
+    const logoutLink = document.getElementById('logout-link');
+    const profileLink = document.getElementById('profile-link');
+    const deleteAccountLink = document.getElementById('delete-account-link');
+    const welcomeHeading = document.getElementById('welcome-heading');
 
-        // Delete account elements
-        const deleteModalOverlay = document.getElementById('delete-modal-overlay');
-        const confirmDeleteButton = document.getElementById('confirm-delete-button');
-        const cancelDeleteButton = document.getElementById('cancel-delete-button');
-        const deleteModalMessage = document.getElementById('delete-modal-message');
+    // Delete account elements
+    const deleteModalOverlay = document.getElementById('delete-modal-overlay');
+    const confirmDeleteButton = document.getElementById('confirm-delete-button');
+    const cancelDeleteButton = document.getElementById('cancel-delete-button');
+    const deleteModalMessage = document.getElementById('delete-modal-message');
 
-        // Profile Picture Upload elements
-        const uploadProfilePictureLink = document.getElementById('upload-profile-picture-link');
-        const profileUploadModalOverlay = document.getElementById('profile-upload-modal-overlay');
-        const profilePictureInput = document.getElementById('profile-picture-input');
-        const profilePicturePreview = document.getElementById('profile-picture-preview');
-        const previewPlaceholder = document.getElementById('preview-placeholder');
-        const uploadPictureButton = document.getElementById('upload-picture-button');
-        const cancelUploadButton = document.getElementById('cancel-upload-button');
-        const profileUploadMessage = document.getElementById('profile-upload-message');
+    // Profile Picture Upload elements
+    const uploadProfilePictureLink = document.getElementById('upload-profile-picture-link');
+    const profileUploadModalOverlay = document.getElementById('profile-upload-modal-overlay');
+    const profilePictureInput = document.getElementById('profile-picture-input');
+    const profilePicturePreview = document.getElementById('profile-picture-preview');
+    const previewPlaceholder = document.getElementById('preview-placeholder');
+    const uploadPictureButton = document.getElementById('upload-picture-button');
+    const cancelUploadButton = document.getElementById('cancel-upload-button');
+    const profileUploadMessage = document.getElementById('profile-upload-message');
 
-        // Change Password elements
-        const changePasswordLinkDropdown = document.getElementById('change-password-link-dropdown');
-        const changePasswordModalOverlay = document.getElementById('change-password-modal-overlay');
-        const currentPasswordInput = document.getElementById('current-password');
-        const newPasswordInput = document.getElementById('new-password');
-        const confirmNewPasswordInput = document.getElementById('confirm-new-password');
-        const submitChangePasswordButton = document.getElementById('submit-change-password-button');
-        const cancelChangePasswordButton = document.getElementById('cancel-change-password-button');
-        const changePasswordMessage = document.getElementById('change-password-message');
+    // Change Password elements
+    const changePasswordLinkDropdown = document.getElementById('change-password-link-dropdown');
+    const changePasswordModalOverlay = document.getElementById('change-password-modal-overlay');
+    const currentPasswordInput = document.getElementById('current-password');
+    const newPasswordInput = document.getElementById('new-password');
+    const confirmNewPasswordInput = document.getElementById('confirm-new-password');
+    const submitChangePasswordButton = document.getElementById('submit-change-password-button');
+    const cancelChangePasswordButton = document.getElementById('cancel-change-password-button');
+    const changePasswordMessage = document.getElementById('change-password-message');
 
-        // Profile Details Modal elements
-        const profileDetailsModalOverlay = document.getElementById('profile-details-modal-overlay');
-        const profileNameSpan = document.getElementById('profile-name');
-        const profileUsernameSpan = document.getElementById('profile-username');
-        const addDetailsButton = document.getElementById('add-details-button');
-        const changePasswordFromProfileButton = document.getElementById('change-password-from-profile-button');
-        const closeProfileDetailsButton = document.getElementById('close-profile-details-button');
+    // Profile Details Modal elements
+    const profileDetailsModalOverlay = document.getElementById('profile-details-modal-overlay');
+    const profileNameSpan = document.getElementById('profile-name');
+    const profileUsernameSpan = document.getElementById('profile-username');
+    const addDetailsButton = document.getElementById('add-details-button');
+    const changePasswordFromProfileButton = document.getElementById('change-password-from-profile-button');
+    const closeProfileDetailsButton = document.getElementById('close-profile-details-button');
 
-        // Feedback Form elements
-        const feedbackNavLink = document.getElementById('feedback-nav-link');
-        const feedbackModalOverlay = document.getElementById('feedback-modal-overlay');
-        const feedbackMessageTextarea = document.getElementById('feedback-message');
-        const submitFeedbackButton = document.getElementById('submit-feedback-button');
-        const cancelFeedbackButton = document.getElementById('cancel-feedback-button');
-        const feedbackStatusMessage = document.getElementById('feedback-status-message');
-
-
-        // Theme Toggle elements
-        const themeToggleButton = document.getElementById('theme-toggle');
-        const themeIcon = document.getElementById('theme-icon');
+    // Feedback Form elements
+    const feedbackNavLink = document.getElementById('feedback-nav-link');
+    const feedbackModalOverlay = document.getElementById('feedback-modal-overlay');
+    const feedbackMessageTextarea = document.getElementById('feedback-message');
+    const submitFeedbackButton = document.getElementById('submit-feedback-button');
+    const cancelFeedbackButton = document.getElementById('cancel-feedback-button');
+    const feedbackStatusMessage = document.getElementById('feedback-status-message');
 
 
-        let firebaseApp;
-        let firebaseAuth;
-        let currentUser; // Stores the current authenticated Firebase user object
+    // Theme Toggle elements
+    const themeToggleButton = document.getElementById('theme-toggle');
+    const themeIcon = document.getElementById('theme-icon');
 
-        // Custom message box function (replaces alert)
-        function showMessageBox(message, type = 'info') {
-            const messageBox = document.createElement('div');
-            messageBox.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white z-[3000]`;
-            
-            let bgColor = '';
-            if (type === 'success') {
-                bgColor = 'bg-green-500';
-            } else if (type === 'error') {
-                bgColor = 'bg-red-500';
-            } else {
-                bgColor = 'bg-blue-500';
-            }
-            messageBox.classList.add(bgColor);
-            
-            messageBox.textContent = message;
-            document.body.appendChild(messageBox);
 
-            setTimeout(() => {
-                messageBox.remove();
-            }, 3000); // Message disappears after 3 seconds
+    let firebaseApp;
+    let firebaseAuth;
+    let currentUser; // Stores the current authenticated Firebase user object
+
+    // Custom message box function (replaces alert)
+    function showMessageBox(message, type = 'info') {
+        const messageBox = document.createElement('div');
+        messageBox.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white z-[3000]`;
+        
+        let bgColor = '';
+        if (type === 'success') {
+            bgColor = 'bg-green-500';
+        } else if (type === 'error') {
+            bgColor = 'bg-red-500';
+        } else {
+            bgColor = 'bg-blue-500';
         }
+        messageBox.classList.add(bgColor);
+        
+        messageBox.textContent = message;
+        document.body.appendChild(messageBox);
 
-        // Function to fetch client config from backend and initialize Firebase
-        async function fetchFirebaseClientConfigAndInit() {
-            console.log("fetchFirebaseClientConfigAndInit called.");
-            try {
-                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        setTimeout(() => {
+            messageBox.remove();
+        }, 3000); // Message disappears after 3 seconds
+    }
 
-                console.log("Firebase Config (from global or null):", firebaseConfig);
-                console.log("Initial Auth Token (from global or null):", initialAuthToken ? "Present" : "Not Present");
+    // Function to fetch client config from backend and initialize Firebase
+    async function fetchFirebaseClientConfigAndInit() {
+        console.log("fetchFirebaseClientConfigAndInit called.");
+        let configToUse = null;
+        let tokenToUse = null;
 
+        try {
+            // 1. Try to get config and token from Canvas global variables
+            if (typeof __firebase_config !== 'undefined' && __firebase_config !== null) {
+                configToUse = JSON.parse(__firebase_config);
+                console.log("Firebase Config loaded from __firebase_config global.");
+            }
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token !== null) {
+                tokenToUse = __initial_auth_token;
+                console.log("Initial Auth Token loaded from __initial_auth_token global.");
+            }
 
-                if (firebaseConfig) {
-                    firebaseApp = initializeApp(firebaseConfig);
-                    firebaseAuth = getAuth(firebaseApp);
-                    console.log("Firebase client app initialized in home.html using global config.");
-
-                    if (initialAuthToken) {
-                        await signInWithCustomToken(firebaseAuth, initialAuthToken);
-                        console.log("Signed in with custom token.");
-                    } else {
-                        await signInAnonymously(firebaseAuth);
-                        console.log("Signed in anonymously.");
-                    }
-
-                    onAuthStateChanged(firebaseAuth, (user) => {
-                        console.log("Auth state changed, user:", user);
-                        if (user) {
-                            currentUser = user;
-                            console.log("Home Page: User is logged in.", currentUser.uid);
-                            updateUserUI(currentUser);
-                            updateWelcomeMessage(currentUser);
-                        } else {
-                            currentUser = null;
-                            console.log("Home Page: User is logged out. Redirecting.");
-                            window.location.href = 'login.html';
-                        }
-                    });
-
+            // 2. If Canvas globals are not available, fetch from backend API (for local dev/fallback)
+            if (!configToUse) {
+                console.warn("Canvas global __firebase_config not found. Attempting to fetch from /api/firebase-config.");
+                const response = await fetch('/api/firebase-config');
+                const configResult = await response.json();
+                if (configResult.success && configResult.config) {
+                    configToUse = configResult.config;
+                    console.log("Firebase client config fetched from /api/firebase-config.");
                 } else {
-                    console.warn("Global __firebase_config not found. Attempting to fetch from mock API.");
-                    const response = await fetch('/api/firebase-config');
-                    const config = await response.json();
-                    if (config.success && config.config) {
-                        firebaseApp = initializeApp(config.config);
-                        firebaseAuth = getAuth(firebaseApp);
-                        console.log("Firebase client app initialized from mock API.");
-
-                        onAuthStateChanged(firebaseAuth, (user) => {
-                            console.log("Auth state changed (from mock API), user:", user);
-                            if (user) {
-                                currentUser = user;
-                                console.log("Home Page: User is logged in.", currentUser.uid);
-                                updateUserUI(currentUser);
-                                updateWelcomeMessage(currentUser);
-                            } else {
-                                currentUser = null;
-                                console.log("Home Page: User is logged out. Redirecting.");
-                                window.location.href = 'login.html';
-                            }
-                        });
-                    } else {
-                        console.error("Failed to fetch Firebase client config:", config.message);
-                        showMessageBox("Error: Could not initialize Firebase. Please try again.", "error");
+                    console.error("Failed to fetch Firebase client config from backend:", configResult.message);
+                    showMessageBox("Error: Could not initialize Firebase. Please try again.", "error");
+                    // Redirect to login or show critical error if config cannot be obtained
+                    if (window.location.pathname !== '/login.html') {
                         window.location.href = 'login.html';
                     }
+                    return; // Stop execution if config is not available
                 }
-            } catch (error) {
-                console.error("Error during Firebase initialization:", error);
-                showMessageBox("Network error: Could not initialize Firebase.", "error");
-                window.location.href = 'login.html';
-            }
-        }
-
-        async function updateUserUI(user) {
-            console.log("Updating UI for user:", user);
-            console.log("User Photo URL:", user.photoURL, "Display Name:", user.displayName, "Email:", user.email);
-            
-            // Update user avatar image
-            if (user.photoURL && user.photoURL.startsWith('http')) {
-                userAvatarImg.src = user.photoURL;
-            } else if (user.photoURL && user.photoURL.startsWith('/uploads/')) {
-                // For locally stored images, ensure the full URL is used if not already
-                // This assumes the app is served from the root, adjust if nested
-                userAvatarImg.src = window.location.origin + user.photoURL;
-            }
-            else {
-                userAvatarImg.src = 'https://placehold.co/40x40/764ba2/ffffff?text=U';
             }
 
-            // Fetch username from backend for navbar display
-            try {
-                const idToken = await user.getIdToken();
-                const response = await fetch('/api/user-profile', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${idToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                });
-                const result = await response.json();
-                if (response.ok && result.success && result.profile) {
-                    const username = result.profile.username || 'User';
-                    navbarUsernameDisplay.textContent = username; // Update navbar username
-                    userDisplayNameSpan.textContent = user.displayName || username; // Update dropdown display name
+            // Initialize Firebase App
+            if (!firebaseApp) { // Only initialize if not already initialized
+                firebaseApp = initializeApp(configToUse);
+                firebaseAuth = getAuth(firebaseApp);
+                console.log("Firebase client app initialized.");
+            }
+
+            // Handle initial authentication (only for login.html and home.html where it's relevant)
+            // This logic should be adapted per page if specific sign-in methods are required on load
+            if (window.location.pathname.includes('home.html') || window.location.pathname.includes('login.html')) {
+                if (tokenToUse) {
+                    try {
+                        await signInWithCustomToken(firebaseAuth, tokenToUse);
+                        console.log("Signed in with custom token.");
+                    } catch (e) {
+                        console.warn("Custom token sign-in failed, attempting anonymous sign-in or redirect:", e);
+                        await signInAnonymously(firebaseAuth); // Fallback
+                    }
                 } else {
-                    console.warn("Failed to fetch user profile for navbar username:", result.message);
-                    navbarUsernameDisplay.textContent = user.displayName || user.email || 'User';
-                    userDisplayNameSpan.textContent = user.displayName || user.email || 'User';
+                    await signInAnonymously(firebaseAuth); // Sign in anonymously if no custom token
+                    console.log("Signed in anonymously.");
                 }
-            } catch (error) {
-                console.error("Error fetching user profile for navbar:", error);
+            }
+
+
+            // Set up the Auth State Changed listener (crucial for all pages)
+            onAuthStateChanged(firebaseAuth, (user) => {
+                console.log("Auth state changed, user:", user ? user.uid : "null");
+                if (user) {
+                    currentUser = user; // Set current user globally
+                    // Page-specific UI updates and redirections
+                    if (window.location.pathname.includes('home.html')) {
+                        updateUserUI(currentUser);
+                        updateWelcomeMessage(currentUser);
+                    } else if (window.location.pathname.includes('login.html') || window.location.pathname.includes('register.html')) {
+                        if (user.emailVerified) {
+                            window.location.href = 'home.html';
+                        } else {
+                            showMessageBox('Please verify your email to continue.', 'warning');
+                            window.location.href = `email_verification.html?email=${encodeURIComponent(user.email)}`;
+                        }
+                    } else if (window.location.pathname.includes('email_verification.html')) {
+                        // On email_verification page, if user becomes verified, redirect to login
+                        if (user.emailVerified) {
+                            showMessageBox('Your email is verified. Redirecting to login.', 'success');
+                            setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+                        }
+                        // Otherwise, the page's existing logic for resending/checking will apply
+                    }
+                } else {
+                    currentUser = null; // Clear current user
+                    // If user logs out or session expires, redirect to login
+                    if (!window.location.pathname.includes('login.html') && !window.location.pathname.includes('register.html')) {
+                        console.log("User logged out or session expired. Redirecting to login.");
+                        window.location.href = 'login.html';
+                    }
+                    // For login/register pages, if user logs out, they stay on the page.
+                }
+            });
+
+        }
+
+    async function updateUserUI(user) {
+        console.log("Updating UI for user:", user);
+        console.log("User Photo URL:", user.photoURL, "Display Name:", user.displayName, "Email:", user.email);
+        
+        // Update user avatar image
+        if (user.photoURL && user.photoURL.startsWith('http')) {
+            userAvatarImg.src = user.photoURL;
+        } else if (user.photoURL && user.photoURL.startsWith('/uploads/')) {
+            // For locally stored images, ensure the full URL is used if not already
+            // This assumes the app is served from the root, adjust if nested
+            userAvatarImg.src = window.location.origin + user.photoURL;
+        }
+        else {
+            userAvatarImg.src = 'https://placehold.co/40x40/764ba2/ffffff?text=U';
+        }
+
+        // Fetch username from backend for navbar display
+        try {
+            const idToken = await user.getIdToken();
+            const response = await fetch('/api/user-profile', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${idToken}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+            const result = await response.json();
+            if (response.ok && result.success && result.profile) {
+                const username = result.profile.username || 'User';
+                navbarUsernameDisplay.textContent = username; // Update navbar username
+                // userDisplayNameSpan.textContent = user.displayName || username; // This ID doesn't exist in HTML
+            } else {
+                console.warn("Failed to fetch user profile for navbar username:", result.message);
                 navbarUsernameDisplay.textContent = user.displayName || user.email || 'User';
-                userDisplayNameSpan.textContent = user.displayName || user.email || 'User';
+                // userDisplayNameSpan.textContent = user.displayName || user.email || 'User';
             }
+        } catch (error) {
+            console.error("Error fetching user profile for navbar:", error);
+            navbarUsernameDisplay.textContent = user.displayName || user.email || 'User';
+            // userDisplayNameSpan.textContent = user.displayName || user.email || 'User';
         }
+    }
 
-        function updateWelcomeMessage(user) {
-            const username = user.displayName || user.email || 'User';
-            console.log("Updating welcome message for username:", username);
-            welcomeHeading.textContent = `Hi, ${username}!`;
-        }
+    function updateWelcomeMessage(user) {
+        const username = user.displayName || user.email || 'User';
+        console.log("Updating welcome message for username:", username);
+        welcomeHeading.textContent = `Hi, ${username}!`;
+    }
 
-        // --- Dropdown Toggle ---
-        userAvatarButton.addEventListener('click', (event) => {
-            event.stopPropagation();
-            userDropdownMenu.classList.toggle('show');
-        });
+    // --- Dropdown Toggle ---
+    userAvatarButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        userDropdownMenu.classList.toggle('show');
+    });
 
-        document.addEventListener('click', (event) => {
-            if (!userDropdownMenu.contains(event.target) && !userAvatarButton.contains(event.target)) {
-                userDropdownMenu.classList.remove('show');
-            }
-        });
-
-        // --- Navigation Links Handlers ---
-        document.getElementById('home-nav-link').addEventListener('click', (event) => {
-            event.preventDefault();
-            showMessageBox('Home page functionality coming soon!', 'info');
-        });
-
-        document.getElementById('services-nav-link').addEventListener('click', (event) => {
-            event.preventDefault();
-            showMessageBox('Services page coming soon!', 'info');
-        });
-
-        // About Us link now directly navigates due to href attribute
-        // No need for a separate JS event listener here as it's a direct link
-
-        feedbackNavLink.addEventListener('click', (event) => {
-            event.preventDefault();
-            showFeedbackModal();
-        });
-
-
-        // --- Logout Functionality ---
-        logoutLink.addEventListener('click', async (event) => {
-            event.preventDefault();
-            if (firebaseAuth) {
-                try {
-                    await signOut(firebaseAuth);
-                } catch (error) {
-                    console.error("Error signing out:", error);
-                    showMessageBox("Error logging out. Please try again.", "error");
-                }
-            }
-        });
-
-        // --- Profile Link (Opens Profile Details Modal) ---
-        profileLink.addEventListener('click', async (event) => {
-            event.preventDefault();
-            userDropdownMenu.classList.remove('show'); // Close main dropdown
-            showProfileDetailsModal();
-            await fetchUserProfileDataToModal(); // Fetch and display user data in the modal
-        });
-
-        // --- Delete Account Functions ---
-        function showDeleteModal() {
-            deleteModalOverlay.classList.add('show');
-            deleteModalMessage.textContent = '';
-            deleteModalMessage.className = 'status-message';
+    document.addEventListener('click', (event) => {
+        if (!userDropdownMenu.contains(event.target) && !userAvatarButton.contains(event.target)) {
             userDropdownMenu.classList.remove('show');
         }
+    });
 
-        function hideDeleteModal() {
-            deleteModalOverlay.classList.remove('show');
-        }
+    // --- Navigation Links Handlers ---
+    document.getElementById('home-nav-link').addEventListener('click', (event) => {
+        event.preventDefault();
+        showMessageBox('Home page functionality coming soon!', 'info');
+    });
 
-        async function deleteUserAccount() {
-            if (!currentUser) {
-                deleteModalMessage.textContent = "Error: User not authenticated. Cannot delete account.";
-                deleteModalMessage.classList.add('error');
-                return;
-            }
+    document.getElementById('services-nav-link').addEventListener('click', (event) => {
+        event.preventDefault();
+        showMessageBox('Services page coming soon!', 'info');
+    });
 
-            deleteModalMessage.textContent = "Deleting account...";
-            deleteModalMessage.classList.add('info');
-            confirmDeleteButton.disabled = true;
-            cancelDeleteButton.disabled = true;
+    feedbackNavLink.addEventListener('click', (event) => {
+        event.preventDefault();
+        showFeedbackModal();
+    });
 
+
+    // --- Logout Functionality ---
+    logoutLink.addEventListener('click', async (event) => {
+        event.preventDefault();
+        if (firebaseAuth) {
             try {
-                const idToken = await currentUser.getIdToken();
-                const identifierToDelete = currentUser.email || userDisplayNameSpan.textContent;
-
-                const response = await fetch('/api/delete-user', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${idToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ identifier: identifierToDelete }),
-                });
-
-                const result = await response.json();
-
-                if (response.ok && result.success) {
-                    deleteModalMessage.textContent = result.message + " Redirecting to login...";
-                    deleteModalMessage.classList.add('success');
-                    await signOut(firebaseAuth);
-                } else if (response.status === 401) {
-                    deleteModalMessage.textContent = "Session expired. Please log in again.";
-                    deleteModalMessage.classList.add('error');
-                    await signOut(firebaseAuth);
-                }
-                else {
-                    deleteModalMessage.textContent = result.message || 'Failed to delete account.';
-                    deleteModalMessage.classList.add('error');
-                }
+                await signOut(firebaseAuth);
             } catch (error) {
-                console.error('Network error deleting account:', error);
-                deleteModalMessage.textContent = 'Network error deleting account. Please try again.';
-                deleteModalMessage.classList.add('error');
-            } finally {
-                confirmDeleteButton.disabled = false;
-                cancelDeleteButton.disabled = false;
+                console.error("Error signing out:", error);
+                showMessageBox("Error logging out. Please try again.", "error");
             }
         }
+    });
 
-        deleteAccountLink.addEventListener('click', (event) => {
-            event.preventDefault();
-            showDeleteModal();
-        });
-        cancelDeleteButton.addEventListener('click', hideDeleteModal);
-        confirmDeleteButton.addEventListener('click', deleteUserAccount);
+    // --- Profile Link (Opens Profile Details Modal) ---
+    profileLink.addEventListener('click', async (event) => {
+        event.preventDefault();
+        userDropdownMenu.classList.remove('show'); // Close main dropdown
+        showProfileDetailsModal();
+        await fetchUserProfileDataToModal(); // Fetch and display user data in the modal
+    });
 
-        // --- Profile Picture Upload Functionality ---
-        uploadProfilePictureLink.addEventListener('click', (event) => {
-            event.preventDefault();
-            profileUploadModalOverlay.classList.add('show');
-            profileUploadMessage.textContent = '';
-            profileUploadMessage.className = 'status-message';
+    // --- Delete Account Functions ---
+    function showDeleteModal() {
+        deleteModalOverlay.classList.add('show');
+        deleteModalMessage.textContent = '';
+        deleteModalMessage.className = 'status-message';
+        userDropdownMenu.classList.remove('show');
+    }
+
+    function hideDeleteModal() {
+        deleteModalOverlay.classList.remove('show');
+    }
+
+    async function deleteUserAccount() {
+        if (!currentUser) {
+            deleteModalMessage.textContent = "Error: User not authenticated. Cannot delete account.";
+            deleteModalMessage.classList.add('error');
+            return;
+        }
+
+        deleteModalMessage.textContent = "Deleting account...";
+        deleteModalMessage.classList.add('info');
+        confirmDeleteButton.disabled = true;
+        cancelDeleteButton.disabled = true;
+
+        try {
+            const idToken = await currentUser.getIdToken();
+            // Pass the UID from the decoded token to the backend
+            const uidToDelete = currentUser.uid; 
+
+            const response = await fetch('/api/delete-user', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${idToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ identifier: uidToDelete }), // Send UID as identifier
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                deleteModalMessage.textContent = result.message + " Redirecting to login...";
+                deleteModalMessage.classList.add('success');
+                await signOut(firebaseAuth);
+            } else if (response.status === 401) {
+                deleteModalMessage.textContent = "Session expired. Please log in again.";
+                deleteModalMessage.classList.add('error');
+                await signOut(firebaseAuth);
+            }
+            else {
+                deleteModalMessage.textContent = result.message || 'Failed to delete account.';
+                deleteModalMessage.classList.add('error');
+            }
+        } catch (error) {
+            console.error('Network error deleting account:', error);
+            deleteModalMessage.textContent = 'Network error deleting account. Please try again.';
+            deleteModalMessage.classList.add('error');
+        } finally {
+            confirmDeleteButton.disabled = false;
+            cancelDeleteButton.disabled = false;
+        }
+    }
+
+    deleteAccountLink.addEventListener('click', (event) => {
+        event.preventDefault();
+        showDeleteModal();
+    });
+    cancelDeleteButton.addEventListener('click', hideDeleteModal);
+    confirmDeleteButton.addEventListener('click', deleteUserAccount);
+
+    // --- Profile Picture Upload Functionality ---
+    uploadProfilePictureLink.addEventListener('click', (event) => {
+        event.preventDefault();
+        profileUploadModalOverlay.classList.add('show');
+        profileUploadMessage.textContent = '';
+        profileUploadMessage.className = 'status-message';
+        profilePicturePreview.classList.add('hidden');
+        profilePicturePreview.src = '';
+        previewPlaceholder.classList.remove('hidden');
+        profilePictureInput.value = '';
+        userDropdownMenu.classList.remove('show');
+    });
+
+    cancelUploadButton.addEventListener('click', () => {
+        profileUploadModalOverlay.classList.remove('show');
+    });
+
+    profilePictureInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                profilePicturePreview.src = e.target.result;
+                profilePicturePreview.classList.remove('hidden');
+                previewPlaceholder.classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+        } else {
             profilePicturePreview.classList.add('hidden');
             profilePicturePreview.src = '';
             previewPlaceholder.classList.remove('hidden');
-            profilePictureInput.value = '';
-            userDropdownMenu.classList.remove('show');
-        });
+        }
+    });
 
-        cancelUploadButton.addEventListener('click', () => {
-            profileUploadModalOverlay.classList.remove('show');
-        });
-
-        profilePictureInput.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    profilePicturePreview.src = e.target.result;
-                    profilePicturePreview.classList.remove('hidden');
-                    previewPlaceholder.classList.add('hidden');
-                };
-                reader.readAsDataURL(file);
-            } else {
-                profilePicturePreview.classList.add('hidden');
-                profilePicturePreview.src = '';
-                previewPlaceholder.classList.remove('hidden');
-            }
-        });
-
-        uploadPictureButton.addEventListener('click', async () => {
-            const file = profilePictureInput.files[0];
-            if (!file) {
-                profileUploadMessage.textContent = 'Please select an image to upload.';
-                profileUploadMessage.classList.add('error');
-                return;
-            }
-
-            if (!currentUser) {
-                profileUploadMessage.textContent = "Error: User not authenticated. Cannot upload picture.";
-                profileUploadMessage.classList.add('error');
-                return;
-            }
-
-            profileUploadMessage.textContent = 'Uploading...';
-            profileUploadMessage.classList.add('info');
-            uploadPictureButton.disabled = true;
-            cancelUploadButton.disabled = true;
-
-            try {
-                const idToken = await currentUser.getIdToken();
-
-                const response = await fetch('/api/upload-profile-picture', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${idToken}`,
-                    },
-                    body: formData,
-                });
-
-                const result = await response.json();
-
-                if (response.ok && result.success && result.photoURL) {
-                    profileUploadMessage.textContent = result.message;
-                    profileUploadMessage.classList.add('success');
-
-                    await updateProfile(currentUser, {
-                        photoURL: result.photoURL
-                    });
-
-                    updateUserUI(currentUser); // Refresh UI with new photoURL
-
-                    showMessageBox('Profile picture updated successfully!', 'success');
-                    setTimeout(() => {
-                        hideProfileUploadModal();
-                    }, 1500);
-                } else if (response.status === 401) {
-                    profileUploadMessage.textContent = "Session expired. Please log in again.";
-                    profileUploadMessage.classList.add('error');
-                    await signOut(firebaseAuth);
-                } else {
-                    profileUploadMessage.textContent = result.message || 'Failed to upload profile picture.';
-                    profileUploadMessage.classList.add('error');
-                }
-            } catch (error) {
-                console.error('Error uploading profile picture:', error);
-                profileUploadMessage.textContent = 'Network error during upload. Please try again.';
-                profileUploadMessage.classList.add('error');
-            } finally {
-                uploadPictureButton.disabled = false;
-                cancelUploadButton.disabled = false;
-            }
-        });
-
-        function hideProfileUploadModal() {
-            profileUploadModalOverlay.classList.remove('show');
+    uploadPictureButton.addEventListener('click', async () => {
+        const file = profilePictureInput.files[0];
+        if (!file) {
+            profileUploadMessage.textContent = 'Please select an image to upload.';
+            profileUploadMessage.classList.add('error');
+            return;
         }
 
-        // --- Change Password Functions ---
-        changePasswordLinkDropdown.addEventListener('click', (event) => {
-            event.preventDefault();
-            userDropdownMenu.classList.remove('show'); // Close main dropdown
-            showChangePasswordModal();
-        });
+        if (!currentUser) {
+            profileUploadMessage.textContent = "Error: User not authenticated. Cannot upload picture.";
+            profileUploadMessage.classList.add('error');
+            return;
+        }
 
-        cancelChangePasswordButton.addEventListener('click', () => {
-            hideChangePasswordModal();
-        });
+        profileUploadMessage.textContent = 'Uploading...';
+        profileUploadMessage.classList.add('info');
+        uploadPictureButton.disabled = true;
+        cancelUploadButton.disabled = true;
 
-        submitChangePasswordButton.addEventListener('click', async () => {
-            const currentPassword = currentPasswordInput.value;
-            const newPassword = newPasswordInput.value;
-            const confirmNewPassword = confirmNewPasswordInput.value;
+        try {
+            const idToken = await currentUser.getIdToken();
+            const formData = new FormData();
+            formData.append('profilePicture', file);
 
-            changePasswordMessage.textContent = ''; // Clear previous messages
-            changePasswordMessage.className = 'status-message';
+            const response = await fetch('/api/upload-profile-picture', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${idToken}`,
+                    // 'Content-Type': 'multipart/form-data' is automatically set by browser when using FormData
+                },
+                body: formData,
+            });
 
-            if (!currentPassword || !newPassword || !confirmNewPassword) {
-                changePasswordMessage.textContent = 'All fields are required.';
-                changePasswordMessage.classList.add('error');
-                return;
-            }
+            const result = await response.json();
 
-            if (newPassword !== confirmNewPassword) {
-                changePasswordMessage.textContent = 'New password and confirmation do not match.';
-                changePasswordMessage.classList.add('error');
-                return;
-            }
+            if (response.ok && result.success && result.photoURL) {
+                profileUploadMessage.textContent = result.message;
+                profileUploadMessage.classList.add('success');
 
-            if (newPassword.length < 6) {
-                changePasswordMessage.textContent = 'New password must be at least 6 characters long.';
-                changePasswordMessage.classList.add('error');
-                return;
-            }
-            
-            changePasswordMessage.textContent = 'Changing password...';
-            changePasswordMessage.classList.add('info');
-            submitChangePasswordButton.disabled = true;
-            cancelChangePasswordButton.disabled = true;
-
-            try {
-                const idToken = await currentUser.getIdToken();
-
-                const response = await fetch('/api/change-password', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${idToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        currentPassword: currentPassword,
-                        newPassword: newPassword
-                    }),
+                await updateProfile(currentUser, {
+                    photoURL: result.photoURL
                 });
 
-                const result = await response.json();
+                updateUserUI(currentUser); // Refresh UI with new photoURL
 
-                if (response.ok && result.success) {
-                    changePasswordMessage.textContent = result.message;
-                    changePasswordMessage.classList.add('success');
-                    showMessageBox('Password changed successfully!', 'success');
-                    
-                    // After successful password change, Firebase invalidates the token.
-                    // The client needs to re-authenticate. Redirect to login.
-                    setTimeout(async () => {
-                        hideChangePasswordModal();
-                        await signOut(firebaseAuth); // Explicitly sign out to trigger onAuthStateChanged
-                        window.location.href = 'login.html'; // Ensure redirection
-                    }, 1500);
+                showMessageBox('Profile picture updated successfully!', 'success');
+                setTimeout(() => {
+                    hideProfileUploadModal();
+                }, 1500);
+            } else if (response.status === 401) {
+                profileUploadMessage.textContent = "Session expired. Please log in again.";
+                profileUploadMessage.classList.add('error');
+                await signOut(firebaseAuth);
+            } else {
+                profileUploadMessage.textContent = result.message || 'Failed to upload profile picture.';
+                profileUploadMessage.classList.add('error');
+            }
+        } catch (error) {
+            console.error('Error uploading profile picture:', error);
+            profileUploadMessage.textContent = 'Network error during upload. Please try again.';
+            profileUploadMessage.classList.add('error');
+        } finally {
+            uploadPictureButton.disabled = false;
+            cancelUploadButton.disabled = false;
+        }
+    });
 
-                } else if (response.status === 401) {
-                    changePasswordMessage.textContent = "Session expired. Please log in again.";
-                    changePasswordMessage.classList.add('error');
-                    await signOut(firebaseAuth);
-                } else {
-                    changePasswordMessage.textContent = result.message || 'Failed to change password.';
-                    changePasswordMessage.classList.add('error');
-                }
-            } catch (error) {
-                console.error('Network error changing password:', error);
+    function hideProfileUploadModal() {
+        profileUploadModalOverlay.classList.remove('show');
+    }
+
+    // --- Change Password Functions ---
+    changePasswordLinkDropdown.addEventListener('click', (event) => {
+        event.preventDefault();
+        userDropdownMenu.classList.remove('show'); // Close main dropdown
+        showChangePasswordModal();
+    });
+
+    cancelChangePasswordButton.addEventListener('click', () => {
+        hideChangePasswordModal();
+    });
+
+    submitChangePasswordButton.addEventListener('click', async () => {
+        const currentPassword = currentPasswordInput.value;
+        const newPassword = newPasswordInput.value;
+        const confirmNewPassword = confirmNewPasswordInput.value;
+
+        changePasswordMessage.textContent = ''; // Clear previous messages
+        changePasswordMessage.className = 'status-message';
+
+        if (!currentPassword || !newPassword || !confirmNewPassword) {
+            changePasswordMessage.textContent = 'All fields are required.';
+            changePasswordMessage.classList.add('error');
+            return;
+        }
+
+        if (newPassword !== confirmNewPassword) {
+            changePasswordMessage.textContent = 'New password and confirmation do not match.';
+            changePasswordMessage.classList.add('error');
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            changePasswordMessage.textContent = 'New password must be at least 6 characters long.';
+            changePasswordMessage.classList.add('error');
+            return;
+        }
+        
+        changePasswordMessage.textContent = 'Changing password...';
+        changePasswordMessage.classList.add('info');
+        submitChangePasswordButton.disabled = true;
+        cancelChangePasswordButton.disabled = true;
+
+        try {
+            // Re-authenticate user before changing password
+            const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
+            await reauthenticateWithCredential(currentUser, credential);
+            console.log("User re-authenticated successfully.");
+
+            const idToken = await currentUser.getIdToken();
+
+            const response = await fetch('/api/change-password', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${idToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    newPassword: newPassword // Only send newPassword to backend
+                }),
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                changePasswordMessage.textContent = result.message;
+                changePasswordMessage.classList.add('success');
+                showMessageBox('Password changed successfully!', 'success');
+                
+                // After successful password change, Firebase invalidates the token.
+                // The client needs to re-authenticate. Redirect to login.
+                setTimeout(async () => {
+                    hideChangePasswordModal();
+                    await signOut(firebaseAuth); // Explicitly sign out to trigger onAuthStateChanged
+                    window.location.href = 'login.html'; // Ensure redirection
+                }, 1500);
+
+            } else if (response.status === 401) {
+                changePasswordMessage.textContent = "Session expired. Please log in again.";
+                changePasswordMessage.classList.add('error');
+                await signOut(firebaseAuth);
+            } else {
+                changePasswordMessage.textContent = result.message || 'Failed to change password.';
+                changePasswordMessage.classList.add('error');
+            }
+        } catch (error) {
+            console.error('Error changing password:', error);
+            if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+                changePasswordMessage.textContent = 'Invalid current password.';
+            } else {
                 changePasswordMessage.textContent = 'Network error changing password. Please try again.';
-                changePasswordMessage.classList.add('error');
-            } finally {
-                submitChangePasswordButton.disabled = false;
-                cancelChangePasswordButton.disabled = false;
             }
-        });
+            changePasswordMessage.classList.add('error');
+        } finally {
+            submitChangePasswordButton.disabled = false;
+            cancelChangePasswordButton.disabled = false;
+        }
+    });
 
-        function showChangePasswordModal() {
-            changePasswordModalOverlay.classList.add('show');
-            changePasswordMessage.textContent = '';
-            changePasswordMessage.className = 'status-message';
-            currentPasswordInput.value = '';
-            newPasswordInput.value = '';
-            confirmNewPasswordInput.value = '';
+    function showChangePasswordModal() {
+        changePasswordModalOverlay.classList.add('show');
+        changePasswordMessage.textContent = '';
+        changePasswordMessage.className = 'status-message';
+        currentPasswordInput.value = '';
+        newPasswordInput.value = '';
+        confirmNewPasswordInput.value = '';
+    }
+
+    function hideChangePasswordModal() {
+        changePasswordModalOverlay.classList.remove('show');
+    }
+
+    // --- Profile Details Modal Functions ---
+    async function showProfileDetailsModal() {
+        profileDetailsModalOverlay.classList.add('show');
+        // Reset content while loading
+        profileNameSpan.textContent = 'Loading...';
+        profileUsernameSpan.textContent = 'Loading...';
+    }
+
+    function hideProfileDetailsModal() {
+        profileDetailsModalOverlay.classList.remove('show');
+    }
+
+    async function fetchUserProfileDataToModal() {
+        if (!currentUser) {
+            profileNameSpan.textContent = 'N/A';
+            profileUsernameSpan.textContent = 'N/A';
+            showMessageBox("Error: User not authenticated. Cannot fetch profile.", "error");
+            return;
         }
 
-        function hideChangePasswordModal() {
-            changePasswordModalOverlay.classList.remove('show');
-        }
+        try {
+            const idToken = await currentUser.getIdToken();
+            const response = await fetch('/api/user-profile', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${idToken}`,
+                    'Content-Type': 'application/json',
+                },
+            });
 
-        // --- Profile Details Modal Functions ---
-        async function showProfileDetailsModal() {
-            profileDetailsModalOverlay.classList.add('show');
-            // Reset content while loading
-            profileNameSpan.textContent = 'Loading...';
-            profileUsernameSpan.textContent = 'Loading...';
-        }
+            const result = await response.json();
 
-        function hideProfileDetailsModal() {
-            profileDetailsModalOverlay.classList.remove('show');
-        }
-
-        async function fetchUserProfileDataToModal() {
-            if (!currentUser) {
-                profileNameSpan.textContent = 'N/A';
-                profileUsernameSpan.textContent = 'N/A';
-                showMessageBox("Error: User not authenticated. Cannot fetch profile.", "error");
-                return;
+            if (response.ok && result.success && result.profile) {
+                profileNameSpan.textContent = result.profile.name || 'N/A';
+                profileUsernameSpan.textContent = result.profile.username || 'N/A';
+            } else if (response.status === 401) {
+                showMessageBox("Session expired. Please log in again.", "error");
+                await signOut(firebaseAuth);
+            } else {
+                profileNameSpan.textContent = 'Error';
+                profileUsernameSpan.textContent = 'Error';
+                showMessageBox(result.message || 'Failed to fetch profile data.', 'error');
             }
+        } catch (error) {
+            console.error('Network error fetching profile:', error);
+            profileNameSpan.textContent = 'Network Error';
+            profileUsernameSpan.textContent = 'Network Error';
+            showMessageBox('Network error fetching profile data. Please try again.', 'error');
+        }
+    }
 
-            try {
-                const idToken = await currentUser.getIdToken();
-                const response = await fetch('/api/user-profile', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${idToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                });
+    // Event listeners for Profile Details Modal
+    closeProfileDetailsButton.addEventListener('click', hideProfileDetailsModal);
 
-                const result = await response.json();
+    addDetailsButton.addEventListener('click', () => {
+        showMessageBox("Add details feature coming soon!", "info");
+    });
 
-                if (response.ok && result.success && result.profile) {
-                    profileNameSpan.textContent = result.profile.name || 'N/A';
-                    profileUsernameSpan.textContent = result.profile.username || 'N/A';
-                } else if (response.status === 401) {
-                    showMessageBox("Session expired. Please log in again.", "error");
-                    await signOut(firebaseAuth);
-                } else {
-                    profileNameSpan.textContent = 'Error';
-                    profileUsernameSpan.textContent = 'Error';
-                    showMessageBox(result.message || 'Failed to fetch profile data.', 'error');
-                }
-            } catch (error) {
-                console.error('Network error fetching profile:', error);
-                profileNameSpan.textContent = 'Network Error';
-                profileUsernameSpan.textContent = 'Network Error';
-                showMessageBox('Network error fetching profile data. Please try again.', 'error');
-            }
+    changePasswordFromProfileButton.addEventListener('click', () => {
+        hideProfileDetailsModal(); // Close profile details modal first
+        showChangePasswordModal(); // Then open change password modal
+    });
+
+    // --- Feedback Form Functions ---
+    function showFeedbackModal() {
+        feedbackModalOverlay.classList.add('show');
+        feedbackMessageTextarea.value = ''; // Clear previous message
+        feedbackStatusMessage.textContent = ''; // Clear status message
+        feedbackStatusMessage.className = 'status-message';
+    }
+
+    function hideFeedbackModal() {
+        feedbackModalOverlay.classList.remove('show');
+    }
+
+    submitFeedbackButton.addEventListener('click', async () => {
+        const feedbackMessage = feedbackMessageTextarea.value.trim();
+        feedbackStatusMessage.textContent = '';
+        feedbackStatusMessage.className = 'status-message';
+
+        if (!feedbackMessage) {
+            feedbackStatusMessage.textContent = 'Feedback message cannot be empty.';
+            feedbackStatusMessage.classList.add('error');
+            return;
         }
 
-        // Event listeners for Profile Details Modal
-        closeProfileDetailsButton.addEventListener('click', hideProfileDetailsModal);
+        feedbackStatusMessage.textContent = 'Sending feedback...';
+        feedbackStatusMessage.classList.add('info');
+        submitFeedbackButton.disabled = true;
+        cancelFeedbackButton.disabled = true;
 
-        addDetailsButton.addEventListener('click', () => {
-            showMessageBox("Add details feature coming soon!", "info");
-        });
+        try {
+            const idToken = await currentUser.getIdToken(); // Get ID token for authentication
 
-        changePasswordFromProfileButton.addEventListener('click', () => {
-            hideProfileDetailsModal(); // Close profile details modal first
-            showChangePasswordModal(); // Then open change password modal
-        });
+            const response = await fetch('/api/send-feedback', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${idToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ message: feedbackMessage }),
+            });
 
-        // --- Feedback Form Functions ---
-        function showFeedbackModal() {
-            feedbackModalOverlay.classList.add('show');
-            feedbackMessageTextarea.value = ''; // Clear previous message
-            feedbackStatusMessage.textContent = ''; // Clear status message
-            feedbackStatusMessage.className = 'status-message';
-        }
+            const result = await response.json();
 
-        function hideFeedbackModal() {
-            feedbackModalOverlay.classList.remove('show');
-        }
-
-        submitFeedbackButton.addEventListener('click', async () => {
-            const feedbackMessage = feedbackMessageTextarea.value.trim();
-            feedbackStatusMessage.textContent = '';
-            feedbackStatusMessage.className = 'status-message';
-
-            if (!feedbackMessage) {
-                feedbackStatusMessage.textContent = 'Feedback message cannot be empty.';
+            if (response.ok && result.success) {
+                feedbackStatusMessage.textContent = 'Feedback sent successfully!';
+                feedbackStatusMessage.classList.add('success');
+                showMessageBox('Thank you!', 'success');
+                setTimeout(() => {
+                    hideFeedbackModal();
+                }, 1500);
+            } else if (response.status === 401) {
+                feedbackStatusMessage.textContent = "Session expired. Please log in again.";
                 feedbackStatusMessage.classList.add('error');
-                return;
-            }
-
-            feedbackStatusMessage.textContent = 'Sending feedback...';
-            feedbackStatusMessage.classList.add('info');
-            submitFeedbackButton.disabled = true;
-            cancelFeedbackButton.disabled = true;
-
-            try {
-                const idToken = await currentUser.getIdToken(); // Get ID token for authentication
-
-                const response = await fetch('/api/send-feedback', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${idToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ message: feedbackMessage }),
-                });
-
-                const result = await response.json();
-
-                if (response.ok && result.success) {
-                    feedbackStatusMessage.textContent = 'Feedback sent successfully!';
-                    feedbackStatusMessage.classList.add('success');
-                    showMessageBox('Thank you!', 'success');
-                    setTimeout(() => {
-                        hideFeedbackModal();
-                    }, 1500);
-                } else if (response.status === 401) {
-                    feedbackStatusMessage.textContent = "Session expired. Please log in again.";
-                    feedbackStatusMessage.classList.add('error');
-                    await signOut(firebaseAuth);
-                } else {
-                    feedbackStatusMessage.textContent = result.message || 'Failed to send feedback.';
-                    feedbackStatusMessage.classList.add('error');
-                }
-            } catch (error) {
-                console.error('Network error sending feedback:', error);
-                feedbackStatusMessage.textContent = 'Network error sending feedback. Please try again.';
+                await signOut(firebaseAuth);
+            } else {
+                feedbackStatusMessage.textContent = result.message || 'Failed to send feedback.';
                 feedbackStatusMessage.classList.add('error');
-            } finally {
-                submitFeedbackButton.disabled = false;
-                cancelFeedbackButton.disabled = false;
             }
-        });
-
-        cancelFeedbackButton.addEventListener('click', hideFeedbackModal);
-
-
-        // --- Light/Dark Mode Toggle Logic ---
-        function applyTheme(theme) {
-            console.log("Applying theme:", theme);
-            if (theme === 'dark') {
-                document.body.classList.remove('light-mode');
-                themeIcon.textContent = '🌙'; // Moon icon for dark mode
-                localStorage.setItem('theme', 'dark');
-            } else {
-                document.body.classList.add('light-mode');
-                themeIcon.textContent = '☀️'; // Sun icon for light mode
-                localStorage.setItem('theme', 'light');
-            }
-            console.log("Body class list after applyTheme:", document.body.classList);
+        } catch (error) {
+            console.error('Network error sending feedback:', error);
+            feedbackStatusMessage.textContent = 'Network error sending feedback. Please try again.';
+            feedbackStatusMessage.classList.add('error');
+        } finally {
+            submitFeedbackButton.disabled = false;
+            cancelFeedbackButton.disabled = false;
         }
+    });
 
-        function toggleTheme() {
-            const currentTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-            console.log("Toggling theme. Current theme:", currentTheme);
-            if (currentTheme === 'dark') {
-                applyTheme('light');
-            } else {
-                applyTheme('dark');
-            }
+    cancelFeedbackButton.addEventListener('click', hideFeedbackModal);
+
+
+    // --- Light/Dark Mode Toggle Logic ---
+    function applyTheme(theme) {
+        console.log("Applying theme:", theme);
+        if (theme === 'dark') {
+            document.body.classList.remove('light-mode');
+            themeIcon.textContent = '🌙'; // Moon icon for dark mode
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.body.classList.add('light-mode');
+            themeIcon.textContent = '☀️'; // Sun icon for light mode
+            localStorage.setItem('theme', 'light');
         }
+        console.log("Body class list after applyTheme:", document.body.classList);
+    }
 
-        // Event listener for the theme toggle button
-        themeToggleButton.addEventListener('click', toggleTheme);
+    function toggleTheme() {
+        const currentTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        console.log("Toggling theme. Current theme:", currentTheme);
+        if (currentTheme === 'dark') {
+            applyTheme('light');
+        } else {
+            applyTheme('dark');
+        }
+    }
 
-        // Apply theme on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log("DOMContentLoaded fired.");
-            fetchFirebaseClientConfigAndInit(); // Initialize Firebase first
-            const savedTheme = localStorage.getItem('theme');
-            console.log("Saved theme from localStorage:", savedTheme);
-            console.log("System prefers dark color scheme:", window.matchMedia('(prefers-color-scheme: dark)').matches);
+    // Event listener for the theme toggle button
+    themeToggleButton.addEventListener('click', toggleTheme);
 
-            if (savedTheme) {
-                applyTheme(savedTheme);
-            } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                // Default to dark if system preference is dark and no saved theme
-                applyTheme('dark');
-            } else {
-                // Default to light if no saved theme and system preference is not dark
-                applyTheme('light');
-            }
-        });
+    // Apply theme on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log("DOMContentLoaded fired.");
+        fetchFirebaseClientConfigAndInit(); // Initialize Firebase first
+        const savedTheme = localStorage.getItem('theme');
+        console.log("Saved theme from localStorage:", savedTheme);
+        console.log("System prefers dark color scheme:", window.matchMedia('(prefers-color-scheme: dark)').matches);
 
-    </script>
+        if (savedTheme) {
+            applyTheme(savedTheme);
+        } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            // Default to dark if system preference is dark and no saved theme
+            applyTheme('dark');
+        } else {
+            // Default to light if no saved theme and system preference is not dark
+            applyTheme('light');
+        }
+    });
+
+</script>
+
 </body>
 </html>
