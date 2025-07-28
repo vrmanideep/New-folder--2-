@@ -179,6 +179,41 @@
                 margin-right: 0.5rem;
             }
         }
+
+        /* Light/Dark Mode Toggle Button */
+        .theme-toggle-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: rgba(25, 25, 25, 0.8); /* Dark mode default */
+            color: #f0f0f0; /* Dark mode icon color */
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+            z-index: 1500;
+        }
+        .light-mode .theme-toggle-button {
+            background-color: rgba(255, 255, 255, 0.9); /* Light mode override */
+            color: #333333; /* Light mode icon color */
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        .theme-toggle-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px var(--shadow-color); /* Uses CSS var for dynamic shadow */
+        }
+        .theme-toggle-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 5px var(--shadow-color); /* Uses CSS var for dynamic shadow */
+        }
     </style>
 </head>
 <body>
@@ -207,6 +242,12 @@
         </p>
     </div>
 
+    <!-- Light/Dark Mode Toggle Button -->
+    <button id="theme-toggle" class="theme-toggle-button">
+        <!-- Sun icon for light mode, Moon icon for dark mode -->
+        <span id="theme-icon">☀️</span>
+    </button>
+
 <script type="module">
     // Import Firebase SDK modules
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
@@ -216,8 +257,12 @@
     const identifierInput = document.getElementById('identifier');
     const passwordInput = document.getElementById('password');
     const loginMessage = document.getElementById('login-message');
-    const loginButton = document.getElementById('login-button'); // Added ID to button and referenced here
-    const googleLoginButton = document.getElementById('google-signin-button'); // Fixed ID: was 'google-login-button'
+    const loginButton = document.getElementById('login-button');
+    const googleLoginButton = document.getElementById('google-signin-button');
+
+    // Theme Toggle elements
+    const themeToggleButton = document.getElementById('theme-toggle');
+    const themeIcon = document.getElementById('theme-icon');
 
     let firebaseApp;
     let firebaseAuth;
@@ -514,9 +559,6 @@
     });
 
     // Light/Dark Mode Toggle Logic
-    const themeToggleButton = document.getElementById('theme-toggle');
-    const themeIcon = document.getElementById('theme-icon');
-
     function applyTheme(theme) {
         if (theme === 'dark') {
             document.body.classList.remove('light-mode');
@@ -538,8 +580,6 @@
         }
     }
 
-    themeToggleButton.addEventListener('click', toggleTheme);
-
     // Apply theme on page load
     document.addEventListener('DOMContentLoaded', () => {
         // Initially disable login buttons until Firebase is ready
@@ -554,6 +594,16 @@
             applyTheme('dark');
         } else {
             applyTheme('light');
+        }
+    });
+
+    // Event listener for the theme toggle button - moved inside DOMContentLoaded to ensure element exists
+    document.addEventListener('DOMContentLoaded', () => {
+        const themeToggleButton = document.getElementById('theme-toggle');
+        if (themeToggleButton) { // Check if element exists before adding listener
+            themeToggleButton.addEventListener('click', toggleTheme);
+        } else {
+            console.warn("Theme toggle button not found. Dark/light mode toggle will not function.");
         }
     });
 
