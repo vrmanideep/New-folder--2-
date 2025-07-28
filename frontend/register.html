@@ -378,6 +378,7 @@
 
         try {
             // 1. Try to get config and token from Canvas global variables
+            console.log("Checking for __firebase_config and __initial_auth_token globals...");
             if (typeof __firebase_config !== 'undefined' && __firebase_config !== null) {
                 configToUse = JSON.parse(__firebase_config);
                 console.log("Firebase Config loaded from __firebase_config global.");
@@ -410,9 +411,18 @@
                 firebaseAuth = getAuth(firebaseApp);
                 console.log("Firebase client app initialized.");
                 isFirebaseReady = true; // Set flag to true after successful initialization
+                console.log("isFirebaseReady set to:", isFirebaseReady);
+
                 // Enable buttons after Firebase is ready
-                registerButton.disabled = false;
-                googleSigninButton.disabled = false;
+                console.log("Attempting to enable register buttons...");
+                if (registerButton) {
+                    registerButton.disabled = false;
+                    console.log("Register button enabled.");
+                }
+                if (googleSigninButton) {
+                    googleSigninButton.disabled = false;
+                    console.log("Google Sign-in button enabled.");
+                }
             }
 
             // Handle initial authentication (only for login.html and home.html where it's relevant)
@@ -457,6 +467,7 @@
             firebaseApp = null;
             firebaseAuth = null;
             isFirebaseReady = false; // Set flag to false on error
+            console.log("isFirebaseReady set to (on error):", isFirebaseReady);
             // Fallback to login page if anything goes wrong
             if (window.location.pathname !== '/login.html') {
                 window.location.href = 'login.html';
@@ -536,7 +547,7 @@
 
         // Ensure firebaseAuth is initialized before proceeding
         if (!isFirebaseReady || !firebaseAuth) {
-            registerMessage.textContent = 'Initializing Firebase. Please wait...';
+            registerMessage.textContent = 'Firebase is not initialized. Please wait or refresh the page.';
             registerMessage.classList.add('info');
             console.error("Firebase Auth is not initialized when register form submitted.");
             return;
