@@ -284,11 +284,12 @@
 <script type="module">
     // Import Firebase SDK modules
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import { getAuth, onAuthStateChanged, signInWithCustomToken, sendEmailVerification, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+    import { getAuth, onAuthStateChanged, signInWithCustomToken, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
     const registerForm = document.getElementById('register-form');
     const nameInput = document.getElementById('name');
     const usernameInput = document.getElementById('username');
+    const emailInput = document.getElementById('email'); // Ensure email input is captured
     const passwordInput = document.getElementById('password');
     const confirmPasswordInput = document.getElementById('confirm-password');
     const registerMessage = document.getElementById('register-message');
@@ -364,7 +365,7 @@
             if (window.location.pathname.includes('home.html') || window.location.pathname.includes('login.html')) {
                 if (tokenToUse) {
                     try {
-                        await signInWithCustomToken(firebaseAuth, tokenToUse);
+                        await signInWithCustomToken(firebaseAuth, tokenToToUse);
                         console.log("Signed in with custom token.");
                     } catch (e) {
                         console.warn("Custom token sign-in failed, attempting anonymous sign-in or redirect:", e);
@@ -382,24 +383,8 @@
                 console.log("Auth state changed, user:", user ? user.uid : "null");
                 if (user) {
                     currentUser = user; // Set current user globally
-                    // Page-specific UI updates and redirections
-                    if (window.location.pathname.includes('home.html')) {
-                        // This block won't be hit on register.html, but kept for general script
-                        // updateUserUI(currentUser);
-                        // updateWelcomeMessage(currentUser);
-                    } else if (window.location.pathname.includes('login.html') || window.location.pathname.includes('register.html')) {
-                        if (user.emailVerified) {
-                            window.location.href = 'home.html';
-                        } else {
-                            showMessageBox('Please verify your email to continue.', 'warning');
-                            window.location.href = `email_verification.html?email=${encodeURIComponent(user.email)}`;
-                        }
-                    } else if (window.location.pathname.includes('email_verification.html')) {
-                        if (user.emailVerified) {
-                            showMessageBox('Your email is verified. Redirecting to login.', 'success');
-                            setTimeout(() => { window.location.href = 'login.html'; }, 1500);
-                        }
-                    }
+                    // For register.html, if user becomes authenticated, always redirect to home
+                    window.location.href = 'home.html';
                 } else {
                     currentUser = null; // Clear current user
                     // On login/register pages, if user logs out, they stay on the page.
@@ -466,13 +451,14 @@
 
         const name = nameInput.value.trim();
         const username = usernameInput.value.trim();
+        const email = emailInput.value.trim(); // Get email from input
         const password = passwordInput.value.trim();
         const confirmPassword = confirmPasswordInput.value.trim();
 
         registerMessage.textContent = ''; // Clear previous messages
         registerMessage.className = 'status-message'; // Reset class
 
-        if (!name || !username || !password || !confirmPassword) {
+        if (!name || !username || !email || !password || !confirmPassword) { // Check email
             registerMessage.textContent = 'All fields are required.';
             registerMessage.classList.add('error');
             return;
@@ -508,7 +494,7 @@
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ name, username, password })
+                body: JSON.stringify({ name, username, email, password }) // Pass email to backend
             });
 
             const result = await response.json();
@@ -516,12 +502,12 @@
             if (response.ok && result.success) {
                 registerMessage.textContent = result.message;
                 registerMessage.classList.add('success');
-                // Optionally, automatically sign in the user if a custom token is returned
+                // Always sign in with custom token and redirect to home
                 if (result.custom_token) {
                     await signInWithCustomToken(firebaseAuth, result.custom_token);
-                    // onAuthStateChanged listener will handle redirection
+                    // onAuthStateChanged listener will handle redirection to home.html
                 } else {
-                    // If no custom token, redirect to login or email verification
+                    // Fallback if no custom token, though it should always return one
                     setTimeout(() => {
                         window.location.href = 'login.html';
                     }, 2000);
