@@ -736,7 +736,6 @@
 
     const userAvatarButton = document.getElementById('user-avatar-button');
     const userAvatarImg = document.getElementById('user-avatar');
-    const userDisplayNameSpan = document.getElementById('user-display-name'); // This ID doesn't exist in HTML, kept for consistency if added later
     const navbarUsernameDisplay = document.getElementById('navbar-username-display');
     const userDropdownMenu = document.getElementById('user-dropdown-menu');
     const logoutLink = document.getElementById('logout-link');
@@ -855,6 +854,9 @@
                 }
             }
 
+            // --- ADDED DEBUG LOG HERE ---
+            console.log("DEBUG: Config object before initializeApp:", configToUse);
+
             // Initialize Firebase App
             if (!firebaseApp) { // Only initialize if not already initialized
                 firebaseApp = initializeApp(configToUse);
@@ -892,10 +894,11 @@
                     } else if (window.location.pathname.includes('login.html') || window.location.pathname.includes('register.html')) {
                         // For login/register, if user is authenticated, always redirect to home
                         window.location.href = 'home.html';
-                    } else if (window.location.pathname.includes('email_verification.html')) {
-                        // If user somehow lands on email_verification while authenticated, redirect to home
-                        window.location.href = 'home.html';
                     }
+                    // Removed email_verification.html redirect as per user request
+                    // else if (window.location.pathname.includes('email_verification.html')) {
+                    //     window.location.href = 'home.html';
+                    // }
                 } else {
                     currentUser = null; // Clear current user
                     // If user logs out or session expires, redirect to login
