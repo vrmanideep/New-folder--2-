@@ -347,28 +347,6 @@
                 }
             }
 
-            // Handle initial authentication for login.html
-            if (window.location.pathname.includes('login.html')) {
-                if (tokenToUse) {
-                    try {
-                        await signInWithCustomToken(firebaseAuth, tokenToUse);
-                        console.log("Signed in with custom token on login.html.");
-                    } catch (e) {
-                        console.warn("Custom token sign-in failed on login.html:", e);
-                        // If custom token fails, and no user is currently authenticated, do nothing.
-                        // The page will remain on the login screen, waiting for user input.
-                        if (!firebaseAuth.currentUser) {
-                            console.log("No current user after custom token failure. Remaining on login page.");
-                        }
-                    }
-                } else {
-                    // If no initial token, and no current user, remain on login page.
-                    if (!firebaseAuth.currentUser) {
-                        console.log("No initial auth token and no current user. Remaining on login page.");
-                    }
-                }
-            }
-
             // Set up the Auth State Changed listener (crucial for all pages)
             onAuthStateChanged(firebaseAuth, (user) => {
                 console.log("Auth state changed, user:", user ? user.uid : "null");
