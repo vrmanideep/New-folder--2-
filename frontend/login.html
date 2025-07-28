@@ -216,12 +216,13 @@
     const identifierInput = document.getElementById('identifier');
     const passwordInput = document.getElementById('password');
     const loginMessage = document.getElementById('login-message');
-    const googleLoginButton = document.getElementById('google-login-button');
-    const forgotPasswordLink = document.getElementById('forgot-password-link');
-    const loginTipsButton = document.getElementById('login-tips-button');
-    const loginTipsModalOverlay = document.getElementById('login-tips-modal-overlay');
-    const loginTipsContent = document.getElementById('login-tips-content');
-    const closeLoginTipsModalButton = document.getElementById('close-login-tips-modal');
+    const googleLoginButton = document.getElementById('google-signin-button'); // Fixed ID: was 'google-login-button'
+    // Removed references to non-existent HTML elements:
+    // const forgotPasswordLink = document.getElementById('forgot-password-link');
+    // const loginTipsButton = document.getElementById('login-tips-button');
+    // const loginTipsModalOverlay = document.getElementById('login-tips-modal-overlay');
+    // const loginTipsContent = document.getElementById('login-tips-content');
+    // const closeLoginTipsModalButton = document.getElementById('close-login-tips-modal');
 
     let firebaseApp;
     let firebaseAuth;
@@ -282,6 +283,9 @@
                 }
             }
 
+            // --- ADDED DEBUG LOG HERE ---
+            console.log("DEBUG: Config object before initializeApp:", configToUse);
+
             // Initialize Firebase App
             if (!firebaseApp) { // Only initialize if not already initialized
                 firebaseApp = initializeApp(configToUse);
@@ -305,7 +309,6 @@
                 }
             }
 
-
             // Set up the Auth State Changed listener (crucial for all pages)
             onAuthStateChanged(firebaseAuth, (user) => {
                 console.log("Auth state changed, user:", user ? user.uid : "null");
@@ -314,15 +317,16 @@
                     // Page-specific UI updates and redirections
                     if (window.location.pathname.includes('home.html')) {
                         // This block won't be hit on login.html, but kept for general script
-                        // updateUserUI(currentUser);
-                        // updateWelcomeMessage(currentUser);
+                        // updateUserUI(currentUser); // This function is in home.html, not login.html
+                        // updateWelcomeMessage(currentUser); // This function is in home.html, not login.html
                     } else if (window.location.pathname.includes('login.html') || window.location.pathname.includes('register.html')) {
-                        // If user is authenticated, always redirect to home
-                        window.location.href = 'home.html';
-                    } else if (window.location.pathname.includes('email_verification.html')) {
-                        // If user somehow lands on email_verification while authenticated, redirect to home
+                        // For login/register, if user is authenticated, always redirect to home
                         window.location.href = 'home.html';
                     }
+                    // Removed email_verification.html redirect as per user request
+                    // else if (window.location.pathname.includes('email_verification.html')) {
+                    //     window.location.href = 'home.html';
+                    // }
                 } else {
                     currentUser = null; // Clear current user
                     // On login/register pages, if user logs out, they stay on the page.
@@ -356,6 +360,14 @@
         if (!identifier || !password) {
             loginMessage.textContent = 'Please enter both username/email and password.';
             loginMessage.classList.add('error');
+            return;
+        }
+
+        // Ensure firebaseAuth is initialized before proceeding
+        if (!firebaseAuth) {
+            loginMessage.textContent = 'Firebase is not initialized. Please try again or refresh the page.';
+            loginMessage.classList.add('error');
+            console.error("Firebase Auth is not initialized when login form submitted.");
             return;
         }
 
@@ -438,6 +450,12 @@
     });
 
     googleLoginButton.addEventListener('click', async () => {
+        // Ensure firebaseAuth is initialized before proceeding
+        if (!firebaseAuth) {
+            showMessageBox('Firebase is not initialized. Please try again or refresh the page.', 'error');
+            console.error("Firebase Auth is not initialized when Google login button clicked.");
+            return;
+        }
         try {
             const provider = new GoogleAuthProvider();
             const result = await signInWithPopup(firebaseAuth, provider);
@@ -474,12 +492,20 @@
         } catch (error) {
             console.error('Google login error:', error);
             let errorMessage = 'Google login failed. Please try again.';
-            if (error.code === 'auth/popup-closed-by-user') {
-                errorMessage = 'Google login popup closed.';
-            } else if (error.code === 'auth/cancelled-popup-request') {
-                errorMessage = 'Google login already in progress.';
-            } else if (error.code === 'auth/operation-not-allowed') {
-                errorMessage = 'Google sign-in is not enabled in Firebase. Please enable it.';
+            if (error.code) {
+                switch (error.code) {
+                    case 'auth/popup-closed-by-user':
+                        errorMessage = 'Google login popup closed.';
+                        break;
+                    case 'auth/cancelled-popup-request':
+                        errorMessage = 'Google login already in progress.';
+                        break;
+                    case 'auth/operation-not-allowed':
+                        errorMessage = 'Google sign-in is not enabled in Firebase. Please enable it.';
+                        break;
+                    default:
+                        errorMessage = error.message;
+                }
             } else if (error.message) {
                 errorMessage = error.message;
             }
@@ -488,58 +514,10 @@
         }
     });
 
-    forgotPasswordLink.addEventListener('click', async (event) => {
-        event.preventDefault();
-        const email = identifierInput.value.trim(); // Use the identifier field for email
-
-        if (!email || !email.includes('@')) {
-            loginMessage.textContent = 'Please enter your registered email in the field above to reset password.';
-            loginMessage.classList.add('error');
-            return;
-        }
-
-        loginMessage.textContent = 'Sending password reset email...';
-        loginMessage.classList.add('info');
-
-        try {
-            await sendPasswordResetEmail(firebaseAuth, email);
-            loginMessage.textContent = 'Password reset email sent! Check your inbox.';
-            loginMessage.classList.add('success');
-        } catch (error) {
-            console.error('Password reset error:', error);
-            let errorMessage = 'Failed to send password reset email.';
-            if (error.code === 'auth/user-not-found') {
-                errorMessage = 'No user found with that email address.';
-            } else if (error.code === 'auth/invalid-email') {
-                errorMessage = 'Please enter a valid email address.';
-            }
-            loginMessage.textContent = errorMessage;
-            loginMessage.classList.add('error');
-        }
-    });
-
-    loginTipsButton.addEventListener('click', async () => {
-        loginTipsContent.innerHTML = '<p class="text-center text-gray-500">Loading tips...</p>';
-        loginTipsModalOverlay.classList.add('show');
-
-        try {
-            const response = await fetch('/api/login-tips');
-            const result = await response.json();
-
-            if (response.ok && result.success && result.tips) {
-                loginTipsContent.innerHTML = '<ul>' + result.tips.map(tip => `<li class="mb-2 last:mb-0">${tip}</li>`).join('') + '</ul>';
-            } else {
-                loginTipsContent.innerHTML = `<p class="text-center text-red-500">${result.message || 'Failed to load tips.'}</p>`;
-            }
-        } catch (error) {
-            console.error('Error fetching login tips:', error);
-            loginTipsContent.innerHTML = '<p class="text-center text-red-500">Network error. Could not load tips.</p>';
-        }
-    });
-
-    closeLoginTipsModalButton.addEventListener('click', () => {
-        loginTipsModalOverlay.classList.remove('show');
-    });
+    // Removed event listeners for non-existent elements
+    // forgotPasswordLink.addEventListener('click', async (event) => { /* ... */ });
+    // loginTipsButton.addEventListener('click', async () => { /* ... */ });
+    // closeLoginTipsModalButton.addEventListener('click', () => { /* ... */ });
 
     // Light/Dark Mode Toggle Logic
     const themeToggleButton = document.getElementById('theme-toggle');
@@ -580,7 +558,9 @@
             applyTheme('light');
         }
     });
+
 </script>
+
 
 </body>
 </html>
