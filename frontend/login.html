@@ -300,6 +300,7 @@
 
         try {
             // 1. Try to get config and token from Canvas global variables
+            console.log("Checking for __firebase_config and __initial_auth_token globals...");
             if (typeof __firebase_config !== 'undefined' && __firebase_config !== null) {
                 configToUse = JSON.parse(__firebase_config);
                 console.log("Firebase Config loaded from __firebase_config global.");
@@ -332,9 +333,18 @@
                 firebaseAuth = getAuth(firebaseApp);
                 console.log("Firebase client app initialized.");
                 isFirebaseReady = true; // Set flag to true after successful initialization
+                console.log("isFirebaseReady set to:", isFirebaseReady);
+
                 // Enable buttons after Firebase is ready
-                loginButton.disabled = false;
-                googleLoginButton.disabled = false;
+                console.log("Attempting to enable login buttons...");
+                if (loginButton) {
+                    loginButton.disabled = false;
+                    console.log("Login button enabled.");
+                }
+                if (googleLoginButton) {
+                    googleLoginButton.disabled = false;
+                    console.log("Google Login button enabled.");
+                }
             }
 
             // Handle initial authentication (only for login.html and home.html where it's relevant)
@@ -385,6 +395,7 @@
             firebaseApp = null;
             firebaseAuth = null;
             isFirebaseReady = false; // Set flag to false on error
+            console.log("isFirebaseReady set to (on error):", isFirebaseReady);
             // Fallback to login page if anything goes wrong
             if (window.location.pathname !== '/login.html') {
                 window.location.href = 'login.html';
@@ -409,7 +420,7 @@
 
         // Ensure firebaseAuth is initialized before proceeding
         if (!isFirebaseReady || !firebaseAuth) {
-            loginMessage.textContent = 'Initializing Firebase. Please wait...';
+            loginMessage.textContent = 'Firebase is not initialized. Please wait or refresh the page.';
             loginMessage.classList.add('info');
             console.error("Firebase Auth is not initialized when login form submitted.");
             return;
@@ -496,7 +507,7 @@
     googleLoginButton.addEventListener('click', async () => {
         // Ensure firebaseAuth is initialized before proceeding
         if (!isFirebaseReady || !firebaseAuth) {
-            showMessageBox('Firebase is not initialized. Please try again or refresh the page.', 'error');
+            showMessageBox('Firebase is not initialized. Please wait or refresh the page.', 'error');
             console.error("Firebase Auth is not initialized when Google login button clicked.");
             return;
         }
