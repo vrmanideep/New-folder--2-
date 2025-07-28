@@ -700,7 +700,7 @@
                 <textarea id="feedback-message" placeholder="Describe your experience and give suggestions" rows="6"></textarea>
             </div>
             <div class="modal-buttons">
-                <button id="submit-feedback-button" class="modal-button">Send Feedback</button>
+                <button id="submit-feedback-button" class="modal-button" disabled>Send Feedback</button>
                 <button id="cancel-feedback-button" class="modal-button cancel">Cancel</button>
             </div>
             <p id="feedback-status-message" class="status-message"></p>
@@ -794,6 +794,7 @@
     let firebaseApp;
     let firebaseAuth;
     let currentUser; // Stores the current authenticated Firebase user object
+    let isFirebaseReady = false; // New flag for Firebase initialization status
 
     // Custom message box function (replaces alert)
     function showMessageBox(message, type = 'info') {
@@ -854,7 +855,6 @@
                 }
             }
 
-            // --- ADDED DEBUG LOG HERE ---
             console.log("DEBUG: Config object before initializeApp:", configToUse);
 
             // Initialize Firebase App
@@ -862,6 +862,13 @@
                 firebaseApp = initializeApp(configToUse);
                 firebaseAuth = getAuth(firebaseApp);
                 console.log("Firebase client app initialized.");
+                isFirebaseReady = true; // Set flag to true after successful initialization
+                // Enable buttons after Firebase is ready
+                // Assuming relevant buttons exist and are disabled initially
+                const uploadPictureButton = document.getElementById('upload-picture-button');
+                const submitFeedbackButton = document.getElementById('submit-feedback-button');
+                if (uploadPictureButton) uploadPictureButton.disabled = false;
+                if (submitFeedbackButton) submitFeedbackButton.disabled = false;
             }
 
             // Handle initial authentication (only for login.html and home.html where it's relevant)
@@ -895,10 +902,6 @@
                         // For login/register, if user is authenticated, always redirect to home
                         window.location.href = 'home.html';
                     }
-                    // Removed email_verification.html redirect as per user request
-                    // else if (window.location.pathname.includes('email_verification.html')) {
-                    //     window.location.href = 'home.html';
-                    // }
                 } else {
                     currentUser = null; // Clear current user
                     // If user logs out or session expires, redirect to login
@@ -913,6 +916,10 @@
         } catch (error) {
             console.error("Critical error during Firebase initialization or auth:", error);
             showMessageBox("Critical error: Could not initialize application. Please try again.", "error");
+            // Ensure firebaseAuth is explicitly nullified on error
+            firebaseApp = null;
+            firebaseAuth = null;
+            isFirebaseReady = false; // Set flag to false on error
             // Fallback to login page if anything goes wrong
             if (window.location.pathname !== '/login.html') {
                 window.location.href = 'login.html';
@@ -950,16 +957,13 @@
             if (response.ok && result.success && result.profile) {
                 const username = result.profile.username || 'User';
                 navbarUsernameDisplay.textContent = username; // Update navbar username
-                // userDisplayNameSpan.textContent = user.displayName || username; // This ID doesn't exist in HTML
             } else {
                 console.warn("Failed to fetch user profile for navbar username:", result.message);
                 navbarUsernameDisplay.textContent = user.displayName || user.email || 'User';
-                // userDisplayNameSpan.textContent = user.displayName || user.email || 'User';
             }
         } catch (error) {
             console.error("Error fetching user profile for navbar:", error);
             navbarUsernameDisplay.textContent = user.displayName || user.email || 'User';
-            // userDisplayNameSpan.textContent = user.displayName || user.email || 'User';
         }
     }
 
@@ -1136,6 +1140,15 @@
             profileUploadMessage.classList.add('error');
             return;
         }
+        
+        // Ensure firebaseAuth is initialized before proceeding
+        if (!isFirebaseReady || !firebaseAuth) {
+            profileUploadMessage.textContent = 'Initializing Firebase. Please wait...';
+            profileUploadMessage.classList.add('info');
+            console.error("Firebase Auth is not initialized when uploading picture.");
+            return;
+        }
+
 
         profileUploadMessage.textContent = 'Uploading...';
         profileUploadMessage.classList.add('info');
@@ -1228,6 +1241,14 @@
         if (newPassword !== confirmNewPassword) {
             changePasswordMessage.textContent = 'New password and confirmation do not match.';
             changePasswordMessage.classList.add('error');
+            return;
+        }
+
+        // Ensure firebaseAuth is initialized before proceeding
+        if (!isFirebaseReady || !firebaseAuth) {
+            changePasswordMessage.textContent = 'Initializing Firebase. Please wait...';
+            changePasswordMessage.classList.add('info');
+            console.error("Firebase Auth is not initialized when changing password.");
             return;
         }
 
@@ -1325,6 +1346,13 @@
             return;
         }
 
+        // Ensure firebaseAuth is initialized before proceeding
+        if (!isFirebaseReady || !firebaseAuth) {
+            showMessageBox('Initializing Firebase. Please wait...', 'info');
+            console.error("Firebase Auth is not initialized when fetching profile data.");
+            return;
+        }
+
         try {
             const idToken = await currentUser.getIdToken();
             const response = await fetch('/api/user-profile', {
@@ -1388,6 +1416,20 @@
         if (!feedbackMessage) {
             feedbackStatusMessage.textContent = 'Feedback message cannot be empty.';
             feedbackStatusMessage.classList.add('error');
+            return;
+        }
+
+        if (!currentUser) {
+            feedbackStatusMessage.textContent = "Error: User not authenticated. Cannot send feedback.";
+            feedbackStatusMessage.classList.add('error');
+            return;
+        }
+
+        // Ensure firebaseAuth is initialized before proceeding
+        if (!isFirebaseReady || !firebaseAuth) {
+            feedbackStatusMessage.textContent = 'Initializing Firebase. Please wait...';
+            feedbackStatusMessage.classList.add('info');
+            console.error("Firebase Auth is not initialized when sending feedback.");
             return;
         }
 
